@@ -9,42 +9,46 @@ def scrape_real_649_data():
         "https://www.lottery.net/canada-lotto-649/numbers/2026",
         "https://www.lottery.net/canada-lotto-649/numbers/2025"
     ]
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+    # 加強版瀏覽器偽裝，防止被彩票網站封鎖
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
+    }
     
     for url in urls:
         print(f"📡 真正抓取中: {url}")
         try:
             resp = requests.get(url, headers=headers, timeout=15)
-            # 用我哋本身有嘅 BeautifulSoup 嚟拆解，避開 lxml error
-            soup = BeautifulSoup(resp.text, 'html.parser')
+            print(f"   -> 網頁回應代碼: {resp.status_code}")
             
-            # 搵網頁入面所有嘅表格
-            for table in soup.find_all('table'):
+            if resp.status_code != 200:
+                print("   -> 🚫 讀取失敗，跳過呢個網頁。")
+                continue
+                
+            # 用內置嘅 HTML Parser 拆解，保證唔會再出 lxml Error
+            soup = BeautifulSoup(resp.text, 'html.parser')
+            tables = soup.find_all('table')
+            print(f"   -> 搵到 {len(tables)} 個表格")
+            
+            for table in tables:
                 for row in table.find_all('tr'):
-                    cols = row.find_all('td')
-                    # 確保最少有兩欄 (日期 + 結果)
+                    cols = row.find_all(['td', 'th'])
                     if len(cols) >= 2:
                         date_str = cols[0].get_text(" ", strip=True)
-                        if "202" not in date_str: continue # 確保係年份行
+                        if "202" not in date_str: 
+                            continue 
                         
-                        # 將後面啲格仔合併成一串文字嚟搵號碼
                         row_text = " ".join([c.get_text(" ") for c in cols[1:]])
-                        
-                        # 用 Regex 抽晒所有 1-49 嘅波出嚟
                         nums_found = [int(x) for x in re.findall(r'\b\d{1,2}\b', row_text) if 1 <= int(x) <= 49]
                         
-                        # 過濾重複數字，只攞頭 6 個主波
                         unique_nums = []
                         for n in nums_found:
                             if n not in unique_nums: unique_nums.append(n)
                             
                         if len(unique_nums) >= 6:
                             main_balls = sorted(unique_nums[:6])
-                            
-                            # 搵金/白波字眼 同埋 12345678-01 抽獎號
                             b_type = "Gold" if ("Gold" in row_text or "gold" in row_text) else "White"
                             pm = re.search(r'\d{8}-\d{2}', row_text)
-                            
                             clean_date = re.sub(r'(?i)latest', '', date_str).strip()
                             
                             all_draws.append({
