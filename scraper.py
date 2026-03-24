@@ -5,10 +5,11 @@ import re
 
 def scrape_real_649_data():
     all_draws = []
+    # 🌟 雙劍合璧：主力去 LotteryCanada 搵詳情，後備去 lottonumbers 補底
     urls = [
-        "https://ca.lottonumbers.com/lotto-649/numbers",
-        "https://ca.lottonumbers.com/lotto-649/numbers/2026",
-        "https://ca.lottonumbers.com/lotto-649/numbers/2025"
+        "https://lotterycanada.com/lotto-649/past-draws",
+        "https://lotterycanada.com/lotto-649",
+        "https://ca.lottonumbers.com/lotto-649/numbers"
     ]
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
@@ -27,31 +28,32 @@ def scrape_real_649_data():
                 cols = row.find_all(['td', 'th'])
                 if len(cols) >= 2:
                     date_str = cols[0].get_text(" ", strip=True)
-                    if not re.search(r'202[4-9]', date_str):
+                    # 只要係 2023-2029 嘅年份就行
+                    if not re.search(r'202[3-9]', date_str):
                         continue
                         
-                    ball_elements = cols[1].find_all(['li', 'span', 'div'])
-                    nums_found = []
-                    for b in ball_elements:
-                        txt = b.get_text(strip=True)
-                        if txt.isdigit():
-                            val = int(txt)
-                            if 1 <= val <= 49 and val not in nums_found:
-                                nums_found.append(val)
+                    # 搵號碼
+                    row_text = cols[1].get_text(" ")
+                    nums_found = [int(x) for x in re.findall(r'\b\d{1,2}\b', row_text) if 1 <= int(x) <= 49]
+                    nums_found = list(dict.fromkeys(nums_found)) # 剷走重複
                     
-                    if len(nums_found) < 6:
-                        row_text = cols[1].get_text(" ")
-                        nums_found = [int(x) for x in re.findall(r'\b\d{1,2}\b', row_text) if 1 <= int(x) <= 49]
-                        nums_found = list(dict.fromkeys(nums_found))
-                        
                     if len(nums_found) >= 6:
                         main_balls = sorted(nums_found[:6])
                         
-                        full_row = row.get_text(" ")
+                        # 🌟 終極金/白波 AI 判斷邏輯
+                        full_row = row.get_text(" ").lower()
                         
-                        # 🌟 核心修復：反向尋找！因為個名一定叫 Gold Ball Draw，所以我哋要靠搵 White 字嚟分辨
-                        b_type = "White" if re.search(r'(?i)white', full_row) else "Gold"
-                        
+                        # 如果明確寫住 white 或者 1,000,000 獎金 -> 白波
+                        if "white" in full_row or "1,000,000" in full_row:
+                            b_type = "White"
+                        # 如果明確寫住 gold ball jackpot -> 金波
+                        elif "gold ball jackpot" in full_row or "gold ball winner" in full_row:
+                            b_type = "Gold"
+                        # 如果含糊不清 (例如 ca.lottonumbers)，按現實概率預設為白波
+                        else:
+                            b_type = "White"
+                            
+                        # 搵抽獎號碼 (12345678-01)
                         pm = re.search(r'\d{8,10}-\d{2}', full_row)
                         clean_date = re.sub(r'(?i)latest|\*', '', date_str).strip()
                         
@@ -66,6 +68,7 @@ def scrape_real_649_data():
             
     df = pd.DataFrame(all_draws)
     if not df.empty:
+        # 智能合併，剷走重複日期，由舊排到新 (方便下面計連續同重複)
         df['date_obj'] = pd.to_datetime(df['date'], errors='coerce')
         df = df.dropna(subset=['date_obj']).drop_duplicates(subset=['date_obj']).sort_values('date_obj', ascending=True)
         return df
@@ -90,12 +93,13 @@ def calculate_metrics(df):
         row['zone'] = f"{len(zones)}個區 ({','.join(map(str, zones))})"
         results.append(row)
         
+    # 計完晒所有嘢，排返由最新到最舊出 CSV
     final_df = pd.DataFrame(results).sort_values('date_obj', ascending=False)
     final_df['date'] = final_df['date_obj'].dt.strftime('%Y-%m-%d')
     return final_df
 
 def main():
-    print("🚀 啟動 Lotto 6/49 神級網址 + 精準金白波版爬蟲...")
+    print("🚀 啟動 Lotto 6/49 智能分辨金白波版爬蟲...")
     raw_df = scrape_real_649_data()
     
     if not raw_df.empty:
