@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lotto 6/49 全自動分析 📈</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <style>
+        /* 直接 Copy 返你 Lotto Max 嗰套 CSS，我就唔重複貼喇，
+           唯獨加下面呢個 Gold Ball 樣式 */
+        .ball-tag { padding: 4px 8px; border-radius: 6px; font-weight: bold; font-size: 11px; }
+        .gold-bg { background: #ffd700; color: #000; }
+        .white-bg { background: #f0f0f0; color: #666; border: 1px solid #ccc; }
+        /* 其餘 CSS 同 Lotto Max 一樣... */
+    </style>
+    </head>
+<body>
+    <div class="container">
+        <h2>Lotto 6/49 數據 Dashboard</h2>
+        <div id="dashboard-container"></div>
+        <div class="table-responsive" id="table-container">正在抓取 6/49 數據...</div>
+    </div>
+
+<script>
+let csvUrl = "data.csv?t=" + new Date().getTime();
+Papa.parse(csvUrl, {
+    download: true, header: true, skipEmptyLines: true,
+    complete: function(results) {
+        let data = results.data;
+        // 統計邏輯同 Lotto Max 一樣，係個 oe 變咗 6 個波
+        // [呢度可以參照 Lotto Max 個 JavaScript，只需改下面呢部分]
+        
+        let html = '<table><thead><tr><th>日期</th><th>號碼 (6 Balls)</th><th>金/白波</th><th>單雙</th><th>連續</th><th>重複</th><th>分區</th></tr></thead><tbody>';
+        
+        data.forEach(row => {
+            let balls = '';
+            for(let i=1; i<=6; i++) balls += `<span class="num-ball">${row['n'+i]}</span>`;
+            
+            let ballClass = row.ball_type === 'Gold' ? 'gold-bg' : 'white-bg';
+            let goldHtml = `<div><span class="ball-tag ${ballClass}">${row.ball_type}</span><br><small>${row.gold_no}</small></div>`;
+            
+            html += `<tr>
+                <td>${row.date}</td>
+                <td>${balls}</td>
+                <td>${goldHtml}</td>
+                <td>${row.odd_even}</td>
+                <td>${row.consecutive === 'Yes' ? '<span class="stat-tag consec-yes">Yes</span>' : '<span class="stat-tag consec-no">No</span>'}</td>
+                <td>${row.repeats}個
