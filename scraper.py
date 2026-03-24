@@ -1,10 +1,10 @@
 import pandas as pd
 import requests
+from bs4 import BeautifulSoup
 import re
 
 def scrape_real_649_data():
     all_draws = []
-    # 呢個先係真正存在、專門記錄加拿大 6/49 嘅權威網站！
     urls = [
         "https://www.lottery.net/canada-lotto-649/numbers/2026",
         "https://www.lottery.net/canada-lotto-649/numbers/2025"
@@ -15,34 +15,36 @@ def scrape_real_649_data():
         print(f"📡 真正抓取中: {url}")
         try:
             resp = requests.get(url, headers=headers, timeout=15)
-            # 神級魔法：自動將網頁入面所有 Table 變成資料表
-            tables = pd.read_html(resp.text)
+            # 用我哋本身有嘅 BeautifulSoup 嚟拆解，避開 lxml error
+            soup = BeautifulSoup(resp.text, 'html.parser')
             
-            for df in tables:
-                # 確保個表有最少兩欄 (日期 + 號碼)
-                if len(df.columns) >= 2 and len(df) > 0:
-                    for _, row in df.iterrows():
-                        date_str = str(row.iloc[0]) # 第一欄永遠係日期
-                        if "202" not in date_str: continue
+            # 搵網頁入面所有嘅表格
+            for table in soup.find_all('table'):
+                for row in table.find_all('tr'):
+                    cols = row.find_all('td')
+                    # 確保最少有兩欄 (日期 + 結果)
+                    if len(cols) >= 2:
+                        date_str = cols[0].get_text(" ", strip=True)
+                        if "202" not in date_str: continue # 確保係年份行
                         
-                        # 將後面啲欄位合埋一齊，抽號碼出嚟
-                        row_str = " ".join(map(str, row.values[1:])) 
-                        nums_found = [int(x) for x in re.findall(r'\b\d{1,2}\b', row_str) if 1 <= int(x) <= 49]
+                        # 將後面啲格仔合併成一串文字嚟搵號碼
+                        row_text = " ".join([c.get_text(" ") for c in cols[1:]])
                         
-                        # 過濾重複數字，攞頭 6 個主波
+                        # 用 Regex 抽晒所有 1-49 嘅波出嚟
+                        nums_found = [int(x) for x in re.findall(r'\b\d{1,2}\b', row_text) if 1 <= int(x) <= 49]
+                        
+                        # 過濾重複數字，只攞頭 6 個主波
                         unique_nums = []
                         for n in nums_found:
                             if n not in unique_nums: unique_nums.append(n)
-                        
+                            
                         if len(unique_nums) >= 6:
                             main_balls = sorted(unique_nums[:6])
                             
-                            # 判斷金波同抽獎號碼
-                            full_row_str = " ".join(map(str, row.values))
-                            b_type = "Gold" if "Gold" in full_row_str or "gold" in full_row_str else "White"
-                            pm = re.search(r'\d{8}-\d{2}', full_row_str)
+                            # 搵金/白波字眼 同埋 12345678-01 抽獎號
+                            b_type = "Gold" if ("Gold" in row_text or "gold" in row_text) else "White"
+                            pm = re.search(r'\d{8}-\d{2}', row_text)
                             
-                            # 清洗日期字眼 (抹走 Latest 呢啲多餘字)
                             clean_date = re.sub(r'(?i)latest', '', date_str).strip()
                             
                             all_draws.append({
@@ -80,7 +82,7 @@ def calculate_metrics(df):
     return pd.DataFrame(results).sort_values('date_obj', ascending=False)
 
 def main():
-    print("🚀 啟動 Lotto 6/49 終極修復版爬蟲...")
+    print("🚀 啟動 Lotto 6/49 免 lxml 完美版爬蟲...")
     raw_df = scrape_real_649_data()
     
     if not raw_df.empty:
@@ -91,7 +93,7 @@ def main():
         print(f"✅ 大功告成！成功寫入 {len(final_df)} 期真實數據落 CSV。")
     else:
         print("❌ 警告：完全搵唔到數據！程式強制終止。")
-        exit(1) # 呢句極重要！如果搵唔到數據，會強制將 Action 變紅交叉，以後唔會再呃到我哋！
+        exit(1)
 
 if __name__ == "__main__":
     main()
