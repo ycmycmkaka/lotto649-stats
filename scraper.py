@@ -5,7 +5,6 @@ import re
 
 def scrape_real_649_data():
     all_draws = []
-    # 🌟 你搵到嘅神級網址！
     urls = [
         "https://ca.lottonumbers.com/lotto-649/numbers",
         "https://ca.lottonumbers.com/lotto-649/numbers/2026",
@@ -19,14 +18,11 @@ def scrape_real_649_data():
         print(f"📡 嘗試抓取: {url}")
         try:
             resp = requests.get(url, headers=headers, timeout=15)
-            print(f"   -> 網頁回應代碼: {resp.status_code}")
-            
             if resp.status_code != 200:
                 continue
                 
             soup = BeautifulSoup(resp.text, 'html.parser')
             
-            # 因為係同一個集團，一定係用 tr 同 td 嘅表格結構
             for row in soup.find_all('tr'):
                 cols = row.find_all(['td', 'th'])
                 if len(cols) >= 2:
@@ -34,7 +30,6 @@ def scrape_real_649_data():
                     if not re.search(r'202[4-9]', date_str):
                         continue
                         
-                    # 抽波波出嚟 (兼容 li, span, div)
                     ball_elements = cols[1].find_all(['li', 'span', 'div'])
                     nums_found = []
                     for b in ball_elements:
@@ -44,20 +39,20 @@ def scrape_real_649_data():
                             if 1 <= val <= 49 and val not in nums_found:
                                 nums_found.append(val)
                     
-                    # 雙重保險：如果搵唔到，用 Regex 直接喺文字度抽
                     if len(nums_found) < 6:
                         row_text = cols[1].get_text(" ")
                         nums_found = [int(x) for x in re.findall(r'\b\d{1,2}\b', row_text) if 1 <= int(x) <= 49]
-                        nums_found = list(dict.fromkeys(nums_found)) # 去除重複
+                        nums_found = list(dict.fromkeys(nums_found))
                         
                     if len(nums_found) >= 6:
                         main_balls = sorted(nums_found[:6])
                         
-                        # 金波白波同埋抽獎號碼
                         full_row = row.get_text(" ")
-                        b_type = "Gold" if re.search(r'(?i)gold', full_row) else "White"
-                        pm = re.search(r'\d{8,10}-\d{2}', full_row)
                         
+                        # 🌟 核心修復：反向尋找！因為個名一定叫 Gold Ball Draw，所以我哋要靠搵 White 字嚟分辨
+                        b_type = "White" if re.search(r'(?i)white', full_row) else "Gold"
+                        
+                        pm = re.search(r'\d{8,10}-\d{2}', full_row)
                         clean_date = re.sub(r'(?i)latest|\*', '', date_str).strip()
                         
                         all_draws.append({
@@ -100,7 +95,7 @@ def calculate_metrics(df):
     return final_df
 
 def main():
-    print("🚀 啟動 Lotto 6/49 (ca.lottonumbers) 神級網址版爬蟲...")
+    print("🚀 啟動 Lotto 6/49 神級網址 + 精準金白波版爬蟲...")
     raw_df = scrape_real_649_data()
     
     if not raw_df.empty:
