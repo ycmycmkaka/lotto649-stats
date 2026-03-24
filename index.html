@@ -6,114 +6,165 @@
     <title>Lotto 6/49 全自動分析 📈</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
-        body { font-family: -apple-system, sans-serif; background: #f0f2f5; padding: 10px; color: #333; margin: 0; }
-        .container { max-width: 1100px; margin: auto; background: white; padding: 15px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-        h2 { text-align: center; color: #d93025; margin-bottom: 5px; font-size: 22px; } /* 649 用紅色主題 */
+        body { font-family: -apple-system, sans-serif; background: #fdf2f2; padding: 10px; color: #333; margin: 0; }
+        .container { max-width: 1100px; margin: auto; background: white; padding: 15px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #d93025; margin-bottom: 5px; font-size: 22px; }
         .update-time { text-align: center; color: #666; font-size: 12px; margin-bottom: 20px; }
         
+        /* 📊 Dashboard 卡片 */
         .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 20px; }
-        .stat-card { background: #fafbfc; border: 1px solid #e1e4e8; border-radius: 10px; padding: 15px; }
+        .stat-card { background: #fffcfc; border: 1px solid #fce8e6; border-radius: 10px; padding: 15px; }
         .stat-card h3 { margin: 0 0 12px 0; font-size: 15px; color: #d93025; border-bottom: 2px solid #fce8e6; padding-bottom: 5px; text-align: center; }
         .total-draws { text-align: center; font-size: 13px; color: #888; margin-bottom: 10px; font-weight: bold; }
         
         .bar-row { display: flex; align-items: center; margin-bottom: 8px; font-size: 13px; }
-        .bar-label { width: 70px; font-weight: 500; }
-        .bar-track { flex-grow: 1; background: #e9ecef; height: 10px; border-radius: 5px; margin: 0 10px; overflow: hidden; }
+        .bar-label { width: 85px; font-weight: 500; color: #444; }
+        .bar-track { flex-grow: 1; background: #eee; height: 10px; border-radius: 5px; margin: 0 10px; overflow: hidden; }
         .bar-fill { height: 100%; border-radius: 5px; background: #d93025; }
-        .bar-pct { width: 45px; text-align: right; font-weight: bold; }
+        .bar-pct { width: 40px; text-align: right; font-weight: bold; color: #555; }
         
-        .table-responsive { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 8px; border: 1px solid #eee;}
-        table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 850px; }
-        th { background: #d93025; color: white; padding: 12px 8px; position: sticky; top: 0; z-index: 10; }
-        td { border-bottom: 1px solid #eee; padding: 12px 8px; text-align: center; }
+        /* 表格排版 */
+        .table-responsive { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 8px; border: 1px solid #eee; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 800px; }
+        th { background: #d93025; color: white; padding: 12px 8px; position: sticky; top: 0; z-index: 10; white-space: nowrap; }
+        td { border-bottom: 1px solid #eee; padding: 12px 8px; text-align: center; vertical-align: middle; }
         
-        .num-ball { display: inline-block; width: 26px; height: 26px; line-height: 26px; border-radius: 50%; background: #fff; margin: 0 2px; font-weight: bold; border: 1px solid #ccc; }
-        .ball-tag { padding: 3px 6px; border-radius: 4px; font-weight: bold; font-size: 11px; }
-        .gold-bg { background: #ffd700; color: #000; }
+        /* 波波樣式 */
+        .balls-container { white-space: nowrap; }
+        .num-ball { display: inline-block; width: 28px; height: 28px; line-height: 28px; border-radius: 50%; background: #fff; margin: 0 2px; font-weight: bold; font-size: 14px; border: 1px solid #d93025; color: #d93025; box-shadow: 1px 1px 2px rgba(0,0,0,0.1); }
+        
+        /* 金波白波標籤 */
+        .ball-tag { padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 11px; display: inline-block; margin-bottom: 4px; }
+        .gold-bg { background: #ffd700; color: #000; border: 1px solid #daa520; }
         .white-bg { background: #f0f0f0; color: #666; border: 1px solid #ccc; }
         
-        .stat-tag { padding: 4px 8px; border-radius: 6px; font-weight: bold; font-size: 12px; }
+        .stat-tag { padding: 4px 8px; border-radius: 6px; font-weight: bold; font-size: 12px; white-space: nowrap; }
         .consec-yes { background: #e6f4ea; color: #1e8e3e; } 
         .consec-no { background: #fce8e6; color: #d93025; }  
+        .repeat-high { background: #fce8e6; color: #d93025; } 
+        .repeat-low { background: #e6f4ea; color: #1e8e3e; }  
         .zone-label { background: #fdf4f4; color: #d93025; border: 1px solid #fce8e6; display: inline-block; }
 
         @media (max-width: 600px) {
             .dashboard { grid-template-columns: 1fr; }
+            h2 { font-size: 18px; }
         }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>Lotto 6/49 走勢分析 📈</h2>
-    <div class="update-time">📊 數據由 649 機械人自動更新</div>
+    <h2>Lotto 6/49 全自動走勢分析 📈</h2>
+    <div class="update-time">📊 數據由 649 機械人自動抓取運算</div>
+    
     <div id="dashboard-container"></div>
-    <div class="table-responsive" id="table-container">正在加載數據...</div>
+    <div class="table-responsive" id="table-container">正在加載最新 6/49 數據...</div>
 </div>
 
 <script>
 let csvUrl = "data.csv?t=" + new Date().getTime();
+
 Papa.parse(csvUrl, {
-    download: true, header: true, skipEmptyLines: true,
+    download: true,
+    header: true,
+    skipEmptyLines: true,
     complete: function(results) {
         let data = results.data;
-        if (data.length === 0) return;
+        if (data.length === 0 || !data[0].n1) {
+            document.getElementById('table-container').innerHTML = "<p style='text-align:center; color:red;'>未搵到數據，請確定 GitHub Actions 已成功執行。</p>";
+            return;
+        }
 
+        // --- 1. 數據統計 ---
         let totalDraws = 0;
-        let stats = { oe: {}, consec: {'Yes (有)':0, 'No (無)':0}, repeats: {'0個':0, '1個':0, '2個或以上':0}, zones: {} };
+        let stats = {
+            oe: {},
+            consec: { 'Yes (有連續)': 0, 'No (無連續)': 0 },
+            repeats: { '0個': 0, '1個': 0, '2個或以上': 0 },
+            zones: {}
+        };
 
         data.forEach(row => {
             if(!row.n1) return;
             totalDraws++;
-            // 統計單雙
-            stats.oe[row.odd_even] = (stats.oe[row.odd_even] || 0) + 1;
-            // 統計連續
-            if(row.consecutive === 'Yes') stats.consec['Yes (有)']++;
-            else stats.consec['No (無)']++;
-            // 統計重複
-            let r = parseInt(row.repeats) || 0;
+
+            // 單雙
+            let oe = row['odd_even'];
+            if(oe) stats.oe[oe] = (stats.oe[oe] || 0) + 1;
+
+            // 連續
+            if(row['consecutive'] === 'Yes') stats.consec['Yes (有連續)']++;
+            else stats.consec['No (無連續)']++;
+
+            // 重複
+            let r = parseInt(row['repeats']) || 0;
             if(r === 0) stats.repeats['0個']++;
             else if(r === 1) stats.repeats['1個']++;
             else stats.repeats['2個或以上']++;
-            // 統計分區
-            if(row.zone) {
-                let z = row.zone.match(/^(\d)/)[1] + '個區';
-                stats.zones[z] = (stats.zones[z] || 0) + 1;
+
+            // 分區
+            let zMatch = row['zone'] ? row['zone'].match(/^(\d)/) : null;
+            if(zMatch) {
+                let zName = zMatch[1] + '個區';
+                stats.zones[zName] = (stats.zones[zName] || 0) + 1;
             }
         });
 
-        // 畫 Dashboard
-        function renderCard(title, obj) {
-            let sorted = Object.entries(obj).sort((a,b)=>b[1]-a[1]);
+        // --- 2. 畫 Dashboard ---
+        function renderCard(title, obj, themeColor) {
+            let sorted = Object.entries(obj).sort((a, b) => b[1] - a[1]);
             let h = `<div class="stat-card"><h3>${title}</h3>`;
-            sorted.forEach(i => {
-                let pct = Math.round((i[1]/totalDraws)*100);
-                h += `<div class="bar-row"><div class="bar-label">${i[0]}</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div><div class="bar-pct">${pct}%</div></div>`;
+            sorted.forEach(item => {
+                let pct = Math.round((item[1] / totalDraws) * 100);
+                h += `<div class="bar-row">
+                    <div class="bar-label">${item[0]}</div>
+                    <div class="bar-track"><div class="bar-fill" style="width: ${pct}%; background: ${themeColor};"></div></div>
+                    <div class="bar-pct">${pct}%</div>
+                </div>`;
             });
             return h + `</div>`;
         }
 
-        document.getElementById('dashboard-container').innerHTML = `<div class="total-draws">分析了 ${totalDraws} 期</div><div class="dashboard">` + 
-            renderCard('單雙分佈', stats.oe) + renderCard('連續號碼', stats.consec) + 
-            renderCard('上期重複', stats.repeats) + renderCard('涵蓋分區', stats.zones) + `</div>`;
+        let dashHtml = `<div class="total-draws">總共分析了 ${totalDraws} 期歷史數據</div><div class="dashboard">`;
+        dashHtml += renderCard('單雙分佈 (Top 4)', Object.fromEntries(Object.entries(stats.oe).slice(0,4)), '#d93025');
+        dashHtml += renderCard('連續號碼', stats.consec, '#1e8e3e');
+        dashHtml += renderCard('上期重複', stats.repeats, '#d93025');
+        dashHtml += renderCard('涵蓋分區', stats.zones, '#d93025');
+        dashHtml += `</div>`;
+        document.getElementById('dashboard-container').innerHTML = dashHtml;
 
-        // 畫表格
-        let html = '<table><thead><tr><th>日期</th><th>號碼</th><th>金/白波抽獎</th><th>單雙</th><th>連續</th><th>重複</th><th>分區</th></tr></thead><tbody>';
+        // --- 3. 畫表格 ---
+        let tableHtml = '<table><thead><tr><th>日期</th><th>開彩號碼 (6 Balls)</th><th>金/白波抽獎</th><th>單雙</th><th>連續</th><th>重複</th><th>分區</th></tr></thead><tbody>';
+
         data.forEach(row => {
-            let balls = '';
-            for(let i=1; i<=6; i++) balls += `<span class="num-ball">${row['n'+i]}</span>`;
-            let ballClass = row.ball_type === 'Gold' ? 'gold-bg' : 'white-bg';
-            html += `<tr>
-                <td>${row.date}</td>
+            if(!row.n1) return;
+            
+            let balls = '<div class="balls-container">';
+            for(let i=1; i<=6; i++) {
+                balls += `<span class="num-ball">${row['n'+i]}</span>`;
+            }
+            balls += '</div>';
+            
+            let bType = row['ball_type'] || 'White';
+            let ballClass = bType === 'Gold' ? 'gold-bg' : 'white-bg';
+            let goldInfo = `<div><span class="ball-tag ${ballClass}">${bType} Ball</span><br><small style="color:#888">${row['gold_no'] || '-'}</small></div>`;
+            
+            let rCount = parseInt(row['repeats']) || 0;
+            let rHtml = rCount >= 2 ? `<span class="stat-tag repeat-high">${rCount} 個</span>` : 
+                        (rCount === 1 ? `<span class="stat-tag repeat-low">1 個</span>` : '0 個');
+
+            tableHtml += `<tr>
+                <td style="font-weight:bold; color:#555;">${row['date']}</td>
                 <td>${balls}</td>
-                <td><span class="ball-tag ${ballClass}">${row.ball_type}</span><br><small>${row.gold_no}</small></td>
-                <td><strong>${row.odd_even}</strong></td>
-                <td>${row.consecutive === 'Yes' ? '<span class="stat-tag consec-yes">Yes</span>' : '<span class="stat-tag consec-no">No</span>'}</td>
-                <td>${row.repeats}個</td>
-                <td><span class="stat-tag zone-label">${row.zone}</span></td>
+                <td>${goldInfo}</td>
+                <td><strong>${row['odd_even']}</strong></td>
+                <td>${row['consecutive'] === 'Yes' ? '<span class="stat-tag consec-yes">Yes</span>' : '<span class="stat-tag consec-no">No</span>'}</td>
+                <td>${rHtml}</td>
+                <td><span class="stat-tag zone-label">${row['zone'] || '-'}</span></td>
             </tr>`;
         });
-        document.getElementById('table-container').innerHTML = html + '</tbody></table>';
+
+        document.getElementById('table-container').innerHTML = tableHtml + '</tbody></table>';
     }
 });
 </script>
