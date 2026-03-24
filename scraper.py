@@ -6,23 +6,19 @@ import re
 
 def scrape_real_649_data():
     all_draws = []
-    # 🌟 用你搵到嘅神級大寶藏網址！
     urls = [
         "https://www.lottomaxnumbers.com/lotto-649/past-numbers",
         "https://www.lottomaxnumbers.com/lotto-649/numbers/2026",
-        "https://www.lottomaxnumbers.com/lotto-649/numbers/2025",
-        "https://www.lottomaxnumbers.com/lotto-649/numbers/2024"
+        "https://www.lottomaxnumbers.com/lotto-649/numbers/2025"
     ]
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
     }
     
     for url in urls:
-        print(f"📡 嘗試抓取: {url}")
+        print(f"📡 掃描大表: {url}")
         try:
             resp = requests.get(url, headers=headers, timeout=15)
-            print(f"   -> 回應代碼: {resp.status_code}")
-            
             if resp.status_code != 200:
                 continue
                 
@@ -35,7 +31,7 @@ def scrape_real_649_data():
                     if not re.search(r'202[4-9]', date_str):
                         continue
                     
-                    # 抽 6 個主波出嚟
+                    # 1. 抽 6 個主波
                     ball_elements = cols[1].find_all(['li', 'span', 'div'])
                     nums_found = []
                     for b in ball_elements:
@@ -52,22 +48,45 @@ def scrape_real_649_data():
                         
                     if len(nums_found) >= 6:
                         main_balls = sorted(nums_found[:6])
+                        clean_date = re.sub(r'(?i)latest|\*', '', date_str).strip()
                         
-                        # 🌟 完美分辨金波白波！
-                        # 呢個網站第三格清楚寫住 "White Ball" 或 "Gold Ball"
+                        # 大表嘅初步判斷
                         prize_col_text = cols[2].get_text(" ").lower()
                         b_type = "White" if "white" in prize_col_text else "Gold"
-                        
-                        # 搵抽獎號碼 (例如 12345678-01)
                         pm = re.search(r'\d{8,10}-\d{2}', prize_col_text)
+                        gold_no = pm.group(0) if pm else "-"
                         
-                        clean_date = re.sub(r'(?i)latest|\*', '', date_str).strip()
+                        # 🌟 特工模式啟動：如果大表無號碼，就「撳入去」詳細頁面搵！
+                        if gold_no == "-":
+                            try:
+                                # 將 "Mar 21, 2026" 變成 "21-03-2026"
+                                date_obj = datetime.strptime(clean_date, "%b %d, %Y")
+                                url_date = date_obj.strftime("%d-%m-%Y")
+                                
+                                detail_url = f"https://www.lottomaxnumbers.com/lotto-649/numbers/{url_date}"
+                                detail_resp = requests.get(detail_url, headers=headers, timeout=5)
+                                
+                                if detail_resp.status_code == 200:
+                                    detail_text = BeautifulSoup(detail_resp.text, 'html.parser').get_text(" ", strip=True).lower()
+                                    
+                                    # 深入尋找金白波字眼
+                                    if "white ball" in detail_text or "white" in detail_text:
+                                        b_type = "White"
+                                    elif "gold ball" in detail_text:
+                                        b_type = "Gold"
+                                        
+                                    # 深入尋找 12345678-01 號碼
+                                    pm_detail = re.search(r'\b\d{8,10}-\d{2}\b', detail_text)
+                                    if pm_detail:
+                                        gold_no = pm_detail.group(0)
+                            except Exception as e:
+                                pass # 萬一詳細頁面出錯，就繼續用預設值，唔會死機
                         
                         all_draws.append({
                             'date': clean_date,
                             'n1': main_balls[0], 'n2': main_balls[1], 'n3': main_balls[2],
                             'n4': main_balls[3], 'n5': main_balls[4], 'n6': main_balls[5],
-                            'ball_type': b_type, 'gold_no': pm.group(0) if pm else "-"
+                            'ball_type': b_type, 'gold_no': gold_no
                         })
         except Exception as e:
             print(f"⚠️ 錯誤: {e}")
@@ -81,7 +100,6 @@ def scrape_real_649_data():
 
 def calculate_metrics(df):
     if df.empty: return df
-    
     prev_numbers = set()
     results = []
     
@@ -103,14 +121,14 @@ def calculate_metrics(df):
     return final_df
 
 def main():
-    print("🚀 啟動 Lotto 6/49 (lottomaxnumbers) 終極神級網址版爬蟲...")
+    print("🚀 啟動 Lotto 6/49 神級特工爬蟲 (自動潛入詳細頁面)...")
     raw_df = scrape_real_649_data()
     
     if not raw_df.empty:
         final_df = calculate_metrics(raw_df)
         cols = ['date','n1','n2','n3','n4','n5','n6','ball_type','gold_no','odd_even','consecutive','repeats','zone']
         final_df[cols].to_csv('data.csv', index=False)
-        print(f"✅ 大功告成！成功寫入 {len(final_df)} 期真實數據落 CSV。")
+        print(f"✅ 大功告成！成功寫入 {len(final_df)} 期完美數據落 CSV。")
     else:
         print("❌ 警告：完全搵唔到數據！程式強制終止。")
         exit(1)
