@@ -110,7 +110,7 @@
 
     table {
       width: 100%;
-      min-width: 1500px;
+      min-width: 1380px;
       border-collapse: collapse;
     }
 
@@ -224,7 +224,9 @@
     const csvUrl = "data.csv?t=" + Date.now();
 
     function safe(v) {
-      return v === undefined || v === null || v === "" ? "-" : v;
+      if (v === undefined || v === null) return "-";
+      const s = String(v).trim();
+      return s === "" || s.toLowerCase() === "nan" ? "-" : s;
     }
 
     function drawCard(title, obj, total, color) {
@@ -274,20 +276,25 @@
         rows.forEach(row => {
           total++;
 
-          stats.oddEven[row.odd_even] = (stats.oddEven[row.odd_even] || 0) + 1;
-          stats.consecutive[row.consecutive === "Yes" ? "Yes" : "No"]++;
+          const oddEven = safe(row.odd_even);
+          stats.oddEven[oddEven] = (stats.oddEven[oddEven] || 0) + 1;
 
-          const r = parseInt(row.repeats) || 0;
+          const consecutive = safe(row.consecutive) === "Yes" ? "Yes" : "No";
+          stats.consecutive[consecutive]++;
+
+          const r = parseInt(row.repeats, 10) || 0;
           if (r === 0) stats.repeats["0個"]++;
           else if (r === 1) stats.repeats["1個"]++;
           else stats.repeats["2個+"]++;
 
           if (row.zone) {
-            const z = row.zone.charAt(0) + "個區";
+            const z = String(row.zone).charAt(0) + "個區";
             stats.zones[z] = (stats.zones[z] || 0) + 1;
           }
 
-          const gp = row.gold_prize_type && row.gold_prize_type.trim() ? row.gold_prize_type : "未提供";
+          const gp = row.gold_prize_type && String(row.gold_prize_type).trim()
+            ? String(row.gold_prize_type).trim()
+            : "未提供";
           stats.goldPrize[gp] = (stats.goldPrize[gp] || 0) + 1;
         });
 
@@ -308,7 +315,6 @@
                 <th>日期</th>
                 <th>主號碼</th>
                 <th>Bonus</th>
-                <th>Classic Result</th>
                 <th>Gold Ball Number</th>
                 <th>Gold Prize</th>
                 <th>Gold Result</th>
@@ -327,22 +333,21 @@
             ballsHtml += `<span class="ball main-ball">${safe(row["n" + i])}</span>`;
           }
 
-          const bonusHtml = row.bonus && row.bonus !== "-"
-            ? `<span class="ball bonus-ball">${row.bonus}</span>`
+          const bonusHtml = safe(row.bonus) !== "-"
+            ? `<span class="ball bonus-ball">${safe(row.bonus)}</span>`
             : `<span class="muted">-</span>`;
 
-          const goldBallHtml = row.gold_ball_number && row.gold_ball_number !== "-"
-            ? `<span class="ball gold-ball">${row.gold_ball_number}</span>`
+          const goldBallHtml = safe(row.gold_ball_number) !== "-"
+            ? `<span class="ball gold-ball">${safe(row.gold_ball_number)}</span>`
             : `<span class="muted">-</span>`;
 
-          const consecClass = row.consecutive === "Yes" ? "yes" : "no";
+          const consecClass = safe(row.consecutive) === "Yes" ? "yes" : "no";
 
           html += `
             <tr>
               <td class="date-cell">${safe(row.date)}</td>
               <td><div class="balls">${ballsHtml}</div></td>
               <td>${bonusHtml}</td>
-              <td class="left">${safe(row.classic_result)}</td>
               <td>${goldBallHtml}</td>
               <td>${safe(row.gold_prize_type)}</td>
               <td class="left">${safe(row.gold_result)}</td>
