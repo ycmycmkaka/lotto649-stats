@@ -2,26 +2,37 @@ name: Lotto 649 Auto Scraper
 
 on:
   schedule:
-    # 逢星期四 (4) 同 星期日 (0) 嘅朝早 8 點 (UTC 時間，即係加拿大凌晨 4 點) 自動行
     - cron: '0 8 * * 0,4'
-  workflow_dispatch: # 保留手動撳掣嘅功能
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   run-scraper:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.9'
+          python-version: '3.11'
+
       - name: Install dependencies
         run: pip install pandas requests beautifulsoup4
+
       - name: Run Scraper
         run: python scraper.py
+
       - name: Commit and Push
         run: |
-          git config --global user.name '649 Bot'
-          git config --global user.email 'bot@649.com'
+          git config --global user.name "649 Bot"
+          git config --global user.email "bot@649.com"
           git add data.csv
-          git commit -m "Auto-update: Latest 6/49 results" || exit 0
+          git diff --cached --quiet && echo "No changes to commit" && exit 0
+          git commit -m "Auto-update: Latest 6/49 results"
+          git pull --rebase
           git push
