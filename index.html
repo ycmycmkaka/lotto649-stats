@@ -1,103 +1,11 @@
-<script>
-let csvUrl = "data.csv?t=" + new Date().getTime();
-
-Papa.parse(csvUrl, {
-    download: true,
-    header: true,
-    skipEmptyLines: true,
-    complete: function(results) {
-        let data = results.data.filter(row => row.n1);
-
-        if (!data.length) {
-            document.getElementById('table-container').innerHTML =
-                "<p style='text-align:center; color:red;'>數據未就緒，請檢查 GitHub Actions 是否成功。</p>";
-            return;
-        }
-
-        let total = 0;
-        let s = {
-            oe: {},
-            consec: { Yes: 0, No: 0 },
-            repeats: { '0個': 0, '1個': 0, '2個+': 0 },
-            zones: {}
-        };
-
-        data.forEach(row => {
-            total++;
-            s.oe[row.odd_even] = (s.oe[row.odd_even] || 0) + 1;
-            s.consec[row.consecutive === 'Yes' ? 'Yes' : 'No']++;
-            let r = parseInt(row.repeats) || 0;
-            if (r === 0) s.repeats['0個']++;
-            else if (r === 1) s.repeats['1個']++;
-            else s.repeats['2個+']++;
-            if (row.zone) {
-                let z = row.zone.charAt(0) + '個區';
-                s.zones[z] = (s.zones[z] || 0) + 1;
-            }
-        });
-
-        function drawCard(title, obj, color) {
-            let sorted = Object.entries(obj).sort((a,b)=>b[1]-a[1]);
-            let h = `<div class="stat-card"><h3>${title}</h3>`;
-            sorted.forEach(i => {
-                let p = total ? Math.round((i[1]/total)*100) : 0;
-                h += `<div class="bar-row">
-                    <div class="bar-label">${i[0]}</div>
-                    <div class="bar-track"><div class="bar-fill" style="width:${p}%; background:${color}"></div></div>
-                    <div class="bar-pct">${p}%</div>
-                </div>`;
-            });
-            return h + '</div>';
-        }
-
-        document.getElementById('dashboard-container').innerHTML =
-            `<div class="dashboard">
-                ${drawCard('單雙分佈', s.oe, '#d93025')}
-                ${drawCard('連續號碼', s.consec, '#1e8e3e')}
-                ${drawCard('上期重複', s.repeats, '#d93025')}
-                ${drawCard('分區數量', s.zones, '#d93025')}
-            </div>`;
-
-        let html = `
-        <table>
-            <thead>
-                <tr>
-                    <th>日期</th>
-                    <th>主號碼 (6 Balls)</th>
-                    <th>白波</th>
-                    <th>Gold 波</th>
-                    <th>完整 Result</th>
-                    <th>單雙</th>
-                    <th>連續</th>
-                    <th>重複</th>
-                    <th>分區走勢</th>
-                </tr>
-            </thead>
-            <tbody>
-        `;
-
-        data.forEach(row => {
-            let balls = '';
-            for (let i = 1; i <= 6; i++) {
-                balls += `<span class="num-ball">${row['n'+i]}</span>`;
-            }
-
-            html += `
-            <tr>
-                <td style="font-weight:bold; color:#555;">${row.date}</td>
-                <td><div style="white-space:nowrap;">${balls}</div></td>
-                <td>${row.white || '-'}</td>
-                <td>${row.gold || '-'}</td>
-                <td style="text-align:left; white-space:nowrap;">${row.result || '-'}</td>
-                <td><strong>${row.odd_even || '-'}</strong></td>
-                <td><span class="stat-tag ${row.consecutive==='Yes'?'consec-yes':'consec-no'}">${row.consecutive || '-'}</span></td>
-                <td>${row.repeats ?? '-'}個</td>
-                <td>${row.zone || '-'}</td>
-            </tr>`;
-        });
-
-        html += '</tbody></table>';
-        document.getElementById('table-container').innerHTML = html;
-    }
-});
-</script>
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Page</title>
+</head>
+<body style="background: yellow; font-size: 40px; padding: 40px;">
+  TEST 123 成功
+</body>
+</html>
