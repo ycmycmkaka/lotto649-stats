@@ -3,10 +3,7 @@ import requests
 from bs4 import BeautifulSoup
 import re
 
-
-HEADERS = {
-    "User-Agent": "Mozilla/5.0"
-}
+HEADERS = {"User-Agent": "Mozilla/5.0"}
 
 LOTTOMAX_URLS = [
     "https://www.lottomaxnumbers.com/lotto-649/numbers/2026",
@@ -25,15 +22,8 @@ def fetch_text(url: str) -> str:
 
 
 def parse_lottomax_text(text: str):
-    """
-    由 lottomaxnumbers 抽：
-    date + 6 個主號碼 + bonus(第7個)
-    """
     draws = []
 
-    # 例：
-    # February 25 2026
-    # 17 24 32 37 46 49 43
     pattern = re.compile(
         r"(January|February|March|April|May|June|July|August|September|October|November|December)"
         r"\s+(\d{1,2})\s+(20\d{2})"
@@ -43,14 +33,10 @@ def parse_lottomax_text(text: str):
     )
 
     for m in pattern.finditer(text):
-        month = m.group(1)
-        day = m.group(2)
-        year = m.group(3)
-        block = m.group(4)
+        month, day, year, block = m.group(1), m.group(2), m.group(3), m.group(4)
 
         nums = [int(x) for x in re.findall(r"\b([1-9]|[1-4]\d)\b", block)]
 
-        # 去重但保留次序
         ordered = []
         for n in nums:
             if n not in ordered:
@@ -69,29 +55,29 @@ def parse_lottomax_text(text: str):
                     "n4": main[3],
                     "n5": main[4],
                     "n6": main[5],
-                    "white": bonus,   # 你網站叫白波
-                    "result": f"{main[0]} - {main[1]} - {main[2]} - {main[3]} - {main[4]} - {main[5]} | White {bonus}"
+                    "bonus": bonus,
+                    "classic_result": f"{main[0]} - {main[1]} - {main[2]} - {main[3]} - {main[4]} - {main[5]} | Bonus {bonus}"
                 })
 
     return draws
 
 
 def parse_olg_goldball(text: str):
-    """
-    由 OLG past results 抽：
-    date -> Gold Ball
-    """
     gold_map = {}
 
-    # 例搜尋摘要格式：
-    # 02. 16. 18. 37. 39. 41. Bonus. 47. GOLD BALL. $1 Million 53673602-09.
-    # 加埋日期通常會喺附近，例如 March 21, 2026
-    blocks = re.split(r"(?=(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s+20\d{2})", text)
+    # 按日期分 block
+    blocks = re.split(
+        r"(?=(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s+20\d{2})",
+        text
+    )
 
     rebuilt = []
     i = 0
     while i < len(blocks):
-        if i + 2 < len(blocks) and re.fullmatch(r"(January|February|March|April|May|June|July|August|September|October|November|December)", str(blocks[i + 1] or "")):
+        if i + 2 < len(blocks) and re.fullmatch(
+            r"(January|February|March|April|May|June|July|August|September|October|November|December)",
+            str(blocks[i + 1] or "")
+        ):
             rebuilt.append(blocks[i + 1] + blocks[i + 2])
             i += 3
         else:
@@ -109,9 +95,24 @@ def parse_olg_goldball(text: str):
         if pd.isna(date):
             continue
 
-        gm = re.search(r"GOLD BALL\.?\s*(?:\$[\d,]+\s+)?([0-9]{8,10}(?:-[0-9]{2})?)", block, re.I)
-        if gm:
-            gold_map[date.strftime("%Y-%m-%d")] = gm.group(1)
+        date_key = date.strftime("%Y-%m-%d")
+
+        # 抽 Gold Ball prize type
+        prize_type = ""
+        if re.search(r"GOLD BALL\.\s*\$1 Million", block, re.I):
+            prize_type = "$1 Million"
+        elif re.search(r"GOLD BALL.*Jackpot", block, re.I):
+            prize_type = "Gold Ball Jackpot"
+
+        # 抽 10 位 winning number
+        gm = re.search(r"GOLD BALL\..*?([0-9]{8,10}(?:-[0-9]{2})?)", block, re.I | re.S)
+        gold_number = gm.group(1) if gm else ""
+
+        gold_map[date_key] = {
+            "gold_ball_number": gold_number,
+            "gold_prize_type": prize_type,
+            "gold_result": f"{prize_type} | {gold_number}".strip(" |")
+        }
 
     return gold_map
 
@@ -122,7 +123,7 @@ def scrape_real_649_data():
     print("🚀 啟動 Lotto 6/49 爬蟲...")
 
     for url in LOTTOMAX_URLS:
-        print(f"📡 抓取主號碼/白波: {url}")
+        print(f"📡 抓取 Classic/Bonus: {url}")
         try:
             text = fetch_text(url)
             draws = parse_lottomax_text(text)
@@ -139,27 +140,21 @@ def scrape_real_649_data():
     df = df.dropna(subset=["date_obj"])
     df = df.sort_values("date_obj").drop_duplicates(subset=["date"], keep="last")
 
-    # Gold Ball
+    df["gold_ball_number"] = ""
+    df["gold_prize_type"] = ""
+    df["gold_result"] = ""
+
     try:
         print(f"📡 抓取 Gold Ball: {OLG_URL}")
         olg_text = fetch_text(OLG_URL)
         gold_map = parse_olg_goldball(olg_text)
-        df["gold"] = df["date"].map(gold_map)
+
+        df["gold_ball_number"] = df["date"].map(lambda d: gold_map.get(d, {}).get("gold_ball_number", ""))
+        df["gold_prize_type"] = df["date"].map(lambda d: gold_map.get(d, {}).get("gold_prize_type", ""))
+        df["gold_result"] = df["date"].map(lambda d: gold_map.get(d, {}).get("gold_result", ""))
     except Exception as e:
         print(f"   ⚠️ Gold Ball 抽取失敗: {e}")
-        df["gold"] = ""
 
-    # 補 result
-    def build_result(row):
-        main = [row[f"n{i}"] for i in range(1, 7)]
-        txt = " - ".join(str(int(x)) for x in main)
-        if pd.notna(row.get("white")) and str(row.get("white")).strip() != "":
-            txt += f" | White {row['white']}"
-        if pd.notna(row.get("gold")) and str(row.get("gold")).strip() != "":
-            txt += f" | Gold {row['gold']}"
-        return txt
-
-    df["result"] = df.apply(build_result, axis=1)
     return df
 
 
@@ -203,7 +198,11 @@ def main():
     cols = [
         "date",
         "n1", "n2", "n3", "n4", "n5", "n6",
-        "white", "gold", "result",
+        "bonus",
+        "classic_result",
+        "gold_ball_number",
+        "gold_prize_type",
+        "gold_result",
         "odd_even", "consecutive", "repeats", "zone"
     ]
 
