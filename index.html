@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lotto 6/49 全自動分析 📈</title>
+    <title>Lotto 6/49 號碼走勢分析 📊</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
         body { font-family: -apple-system, sans-serif; background: #fdf2f2; padding: 10px; color: #333; margin: 0; }
@@ -27,10 +27,6 @@
         
         .num-ball { display: inline-block; width: 28px; height: 28px; line-height: 28px; border-radius: 50%; background: #fff; margin: 0 2px; font-weight: bold; border: 1px solid #d93025; color: #d93025; }
         
-        /* 獎金標籤 */
-        .prize-tag { padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 13px; display: inline-block; background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
-        .prize-reset { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; } /* $10M 重新洗牌變綠色 */
-        
         .stat-tag { padding: 4px 8px; border-radius: 6px; font-weight: bold; font-size: 12px; }
         .consec-yes { background: #e6f4ea; color: #1e8e3e; } 
         .consec-no { background: #fce8e6; color: #d93025; }
@@ -39,8 +35,8 @@
 </head>
 <body>
 <div class="container">
-    <h2>Lotto 6/49 全自動走勢分析 📈</h2>
-    <div class="update-time">📊 數據由 649 機械人極速更新 (獎金追蹤模式)</div>
+    <h2>Lotto 6/49 號碼走勢分析 📊</h2>
+    <div class="update-time">📊 數據由 649 機械人極速更新 (專注核心主號碼)</div>
     <div id="dashboard-container"></div>
     <div class="table-responsive" id="table-container">正在加載數據...</div>
 </div>
@@ -79,19 +75,14 @@ Papa.parse(csvUrl, {
         }
         document.getElementById('dashboard-container').innerHTML = `<div class="dashboard">${drawCard('單雙分佈', s.oe, '#d93025')}${drawCard('連續號碼', s.consec, '#1e8e3e')}${drawCard('上期重複', s.repeats, '#d93025')}${drawCard('分區數量', s.zones, '#d93025')}</div>`;
 
-        // --- 畫表格 ---
-        let html = '<table><thead><tr><th>日期</th><th>號碼 (6 Balls)</th><th>累積金球獎金 (Gold Ball Prize)</th><th>單雙</th><th>連續</th><th>重複</th><th>分區</th></tr></thead><tbody>';
+        // --- 畫表格 (剷除金球欄位) ---
+        let html = '<table><thead><tr><th>日期</th><th>核心號碼 (6 Balls)</th><th>單雙</th><th>連續</th><th>重複</th><th>分區走勢</th></tr></thead><tbody>';
         data.forEach(row => {
             let balls = ''; for(let i=1; i<=6; i++) balls += `<span class="num-ball">${row['n'+i]}</span>`;
-            
-            // 判斷獎金係咪 $10M，係就變綠色
-            let prize = row.gold_prize || '-';
-            let prizeClass = (prize.includes('10,000,000') || prize.includes('10 Million')) ? 'prize-tag prize-reset' : 'prize-tag';
             
             html += `<tr>
                 <td style="font-weight:bold; color:#555;">${row.date}</td>
                 <td><div style="white-space:nowrap;">${balls}</div></td>
-                <td><span class="${prizeClass}">${prize}</span></td>
                 <td><strong>${row.odd_even}</strong></td>
                 <td><span class="stat-tag ${row.consecutive==='Yes'?'consec-yes':'consec-no'}">${row.consecutive}</span></td>
                 <td>${row.repeats}個</td>
