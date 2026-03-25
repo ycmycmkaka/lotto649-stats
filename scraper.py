@@ -1,26 +1,45 @@
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
-from datetime import datetime
 import re
+import time
+import os
+
+def load_existing_data():
+    """讀取現有 CSV，記住已經搵到嘅金波號碼，避免重複抓取被 Block"""
+    existing = {}
+    if os.path.exists('data.csv'):
+        try:
+            df = pd.read_csv('data.csv')
+            for _, r in df.iterrows():
+                # 如果嗰期已經有靚靚嘅抽獎號碼 (唔係 "-")，就記住佢
+                if pd.notna(r.get('gold_no')) and str(r['gold_no']).strip() != "-":
+                    existing[str(r['date'])] = {
+                        'ball_type': r.get('ball_type', 'White'),
+                        'gold_no': str(r['gold_no']).strip()
+                    }
+        except: pass
+    return existing
 
 def scrape_real_649_data():
     all_draws = []
+    existing_data = load_existing_data()
+    print(f"📂 已經從記憶體讀取 {len(existing_data)} 期舊資料，準備開工...")
+    
     urls = [
         "https://www.lottomaxnumbers.com/lotto-649/past-numbers",
         "https://www.lottomaxnumbers.com/lotto-649/numbers/2026",
         "https://www.lottomaxnumbers.com/lotto-649/numbers/2025"
     ]
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     }
     
     for url in urls:
         print(f"📡 掃描大表: {url}")
         try:
             resp = requests.get(url, headers=headers, timeout=15)
-            if resp.status_code != 200:
-                continue
+            if resp.status_code != 200: continue
                 
             soup = BeautifulSoup(resp.text, 'html.parser')
             
@@ -28,67 +47,57 @@ def scrape_real_649_data():
                 cols = row.find_all(['td', 'th'])
                 if len(cols) >= 3:
                     date_str = cols[0].get_text(" ", strip=True)
-                    if not re.search(r'202[4-9]', date_str):
-                        continue
+                    if not re.search(r'202[4-9]', date_str): continue
                     
-                    # 1. 抽 6 個主波
-                    ball_elements = cols[1].find_all(['li', 'span', 'div'])
+                    clean_date = re.sub(r'(?i)latest|\*', '', date_str).strip()
+                    
+                    # 抽 6 個主波
                     nums_found = []
-                    for b in ball_elements:
+                    for b in cols[1].find_all(['li', 'span', 'div']):
                         txt = b.get_text(strip=True)
-                        if txt.isdigit():
-                            val = int(txt)
-                            if 1 <= val <= 49 and val not in nums_found:
-                                nums_found.append(val)
-                                
+                        if txt.isdigit() and int(txt) <= 49 and int(txt) not in nums_found:
+                            nums_found.append(int(txt))
+                            
                     if len(nums_found) < 6:
                         row_text = cols[1].get_text(" ")
-                        nums_found = [int(x) for x in re.findall(r'\b\d{1,2}\b', row_text) if 1 <= int(x) <= 49]
-                        nums_found = list(dict.fromkeys(nums_found))
+                        nums_found = list(dict.fromkeys([int(x) for x in re.findall(r'\b\d{1,2}\b', row_text) if int(x) <= 49]))
                         
                     if len(nums_found) >= 6:
                         main_balls = sorted(nums_found[:6])
-                        clean_date = re.sub(r'(?i)latest|\*', '', date_str).strip()
                         
-                        # 大表嘅初步判斷
-                        prize_col_text = cols[2].get_text(" ").lower()
-                        b_type = "White" if "white" in prize_col_text else ("Gold" if "gold" in prize_col_text else "?")
-                        pm = re.search(r'\d{8,10}-\d{2}', prize_col_text)
-                        gold_no = pm.group(0) if pm else "-"
-                        
-                        # 🌟 特工模式 2.0：直接喺大表條 Link 撳入去！
-                        if gold_no == "-" or b_type == "?":
-                            try:
-                                link = row.find('a') # 自動搵隱藏嘅網址
-                                detail_url = ""
-                                if link and link.has_attr('href'):
-                                    detail_url = link['href']
-                                    if not detail_url.startswith('http'):
-                                        detail_url = "https://www.lottomaxnumbers.com" + detail_url
-                                        
-                                if detail_url:
-                                    print(f"   🕵️ 潛入分析: {clean_date}")
+                        # 🌟 記憶體系統：如果已經查過呢期，直接抄舊答案，跳過潛入！
+                        if clean_date in existing_data:
+                            b_type = existing_data[clean_date]['ball_type']
+                            gold_no = existing_data[clean_date]['gold_no']
+                        else:
+                            # 否則，啟動特工模式潛入
+                            b_type = "White"
+                            gold_no = "-"
+                            link = row.find('a')
+                            if link and link.has_attr('href'):
+                                detail_url = link['href']
+                                if not detail_url.startswith('http'):
+                                    detail_url = "https://www.lottomaxnumbers.com" + detail_url
+                                
+                                print(f"   🕵️ 潛入新日子: {clean_date} (扮真人停頓 2 秒...)")
+                                time.sleep(2) # 🌟 致命武器：停頓 2 秒，防止被網站保安封鎖
+                                
+                                try:
                                     detail_resp = requests.get(detail_url, headers=headers, timeout=10)
                                     if detail_resp.status_code == 200:
-                                        detail_soup = BeautifulSoup(detail_resp.text, 'html.parser')
-                                        # 將成個網頁嘅字變細階，方便搵
-                                        detail_text = detail_soup.get_text(" ", strip=True).lower()
+                                        detail_text = BeautifulSoup(detail_resp.text, 'html.parser').get_text(" ", strip=True).lower()
                                         
-                                        # 搵 12345678-01 呢種格式嘅號碼
-                                        pm_detail = re.search(r'\b\d{8,10}-\d{2}\b', detail_text)
+                                        # 包容埋有空格嘅號碼格式
+                                        pm_detail = re.search(r'\b\d{8,10}\s*-\s*\d{2}\b', detail_text)
                                         if pm_detail:
-                                            gold_no = pm_detail.group(0)
+                                            gold_no = pm_detail.group(0).replace(" ", "")
                                             
-                                        # 搵係咪白波 (通常白波會寫明 "white ball")
-                                        if "white ball" in detail_text or "white" in detail_text:
-                                            b_type = "White"
-                                        elif "gold ball" in detail_text:
+                                        if "gold ball winner" in detail_text or "gold ball jackpot" in detail_text:
                                             b_type = "Gold"
-                            except Exception as e:
-                                pass # 潛入失敗都唔會死機，繼續行
-                                
-                        # 如果全部都搵唔到，按機率預設為白波
-                        if b_type == "?": b_type = "White"
+                                        elif "white ball" in detail_text:
+                                            b_type = "White"
+                                except Exception as e:
+                                    print(f"     ❌ 潛入失敗，可能被擋: {e}")
                         
                         all_draws.append({
                             'date': clean_date,
@@ -97,13 +106,12 @@ def scrape_real_649_data():
                             'ball_type': b_type, 'gold_no': gold_no
                         })
         except Exception as e:
-            print(f"⚠️ 錯誤: {e}")
+            print(f"⚠️ 大表錯誤: {e}")
             
     df = pd.DataFrame(all_draws)
     if not df.empty:
         df['date_obj'] = pd.to_datetime(df['date'], errors='coerce')
-        df = df.dropna(subset=['date_obj']).drop_duplicates(subset=['date_obj']).sort_values('date_obj', ascending=True)
-        return df
+        return df.dropna(subset=['date_obj']).drop_duplicates('date_obj').sort_values('date_obj', ascending=True)
     return pd.DataFrame()
 
 def calculate_metrics(df):
@@ -129,16 +137,16 @@ def calculate_metrics(df):
     return final_df
 
 def main():
-    print("🚀 啟動 Lotto 6/49 神級特工爬蟲 2.0 (自動追蹤導航)...")
+    print("🚀 啟動 Lotto 6/49 終極隱形特工爬蟲 (帶記憶功能)...")
     raw_df = scrape_real_649_data()
     
     if not raw_df.empty:
         final_df = calculate_metrics(raw_df)
         cols = ['date','n1','n2','n3','n4','n5','n6','ball_type','gold_no','odd_even','consecutive','repeats','zone']
         final_df[cols].to_csv('data.csv', index=False)
-        print(f"✅ 大功告成！成功寫入 {len(final_df)} 期完美數據落 CSV。")
+        print(f"✅ 大功告成！成功寫入 {len(final_df)} 期完美數據。")
     else:
-        print("❌ 警告：完全搵唔到數據！程式強制終止。")
+        print("❌ 警告：搵唔到數據！強制終止。")
         exit(1)
 
 if __name__ == "__main__":
