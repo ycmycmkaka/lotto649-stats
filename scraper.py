@@ -29,7 +29,6 @@ def scrape_real_649_data():
                     date_str = cols[0].get_text(" ", strip=True)
                     if not re.search(r'202[4-9]', date_str): continue
                     
-                    # 1. 抽 6 個主波
                     nums_found = []
                     for b in cols[1].find_all(['li', 'span', 'div']):
                         txt = b.get_text(strip=True)
@@ -44,14 +43,22 @@ def scrape_real_649_data():
                         main_balls = sorted(nums_found[:6])
                         clean_date = re.sub(r'(?i)latest|\*', '', date_str).strip()
                         
-                        # 🌟 新策略：直接抽獎金金額！
+                        # 🌟 智能獎金過濾系統啟動
                         prize_text = cols[2].get_text(" ", strip=True)
-                        # 嘗試搵 $xx,xxx,xxx 或 $xx Million
-                        money_match = re.search(r'\$[0-9,]+(?:\s*Million)?', prize_text, re.IGNORECASE)
-                        if money_match:
-                            gold_prize = money_match.group(0)
+                        
+                        # 搵晒同一格入面所有嘅金錢數字出嚟
+                        money_matches = re.findall(r'\$[0-9,]+(?:\s*Million)?', prize_text, re.IGNORECASE)
+                        
+                        gold_prize = "-"
+                        if money_matches:
+                            # 篩走 "5 Million" 或者 "5,000,000" (因為呢個係死數 Classic Draw)
+                            filtered = [m for m in money_matches if '5,000,000' not in m and '5 Million' not in m]
+                            
+                            if filtered:
+                                gold_prize = filtered[-1] # 攞最後嗰個，即係真正嘅 Gold Ball 獎金
+                            else:
+                                gold_prize = money_matches[-1] # 萬一真係得返一個，就照殺
                         else:
-                            # 搵唔到 $ 就直接寫低文字
                             gold_prize = prize_text[:20] if prize_text else "-"
                             
                         all_draws.append({
@@ -92,7 +99,7 @@ def calculate_metrics(df):
     return final_df
 
 def main():
-    print("🚀 啟動 Lotto 6/49 獎金追蹤極速版爬蟲...")
+    print("🚀 啟動 Lotto 6/49 智能獎金追蹤爬蟲 (完美過濾 Classic 5M)...")
     raw_df = scrape_real_649_data()
     
     if not raw_df.empty:
