@@ -3,9 +3,208 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Test Page</title>
+  <title>Lotto 6/49 號碼走勢分析</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f8f8f8;
+      margin: 0;
+      padding: 20px;
+      color: #333;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+    h1 {
+      margin: 0 0 8px;
+      text-align: center;
+      color: #d93025;
+    }
+    .sub {
+      text-align: center;
+      color: #666;
+      margin-bottom: 20px;
+    }
+    .msg {
+      padding: 12px;
+      border-radius: 8px;
+      background: #fff4e5;
+      color: #8a5300;
+      margin-bottom: 16px;
+    }
+    .table-wrap {
+      overflow-x: auto;
+    }
+    table {
+      width: 100%;
+      min-width: 1000px;
+      border-collapse: collapse;
+    }
+    th {
+      background: #d93025;
+      color: white;
+      padding: 12px 8px;
+      text-align: center;
+    }
+    td {
+      border-bottom: 1px solid #eee;
+      padding: 12px 8px;
+      text-align: center;
+      vertical-align: middle;
+    }
+    .balls {
+      white-space: nowrap;
+    }
+    .ball {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      margin: 0 2px;
+      font-weight: bold;
+      font-size: 14px;
+    }
+    .main-ball {
+      background: #fff;
+      color: #d93025;
+      border: 1px solid #d93025;
+    }
+    .white-ball {
+      background: #f5f5f5;
+      color: #222;
+      border: 1px solid #bbb;
+    }
+    .gold-ball {
+      background: #f4c542;
+      color: #222;
+      border: 1px solid #c89f19;
+    }
+    .yes {
+      display: inline-block;
+      background: #e6f4ea;
+      color: #1e8e3e;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-weight: bold;
+    }
+    .no {
+      display: inline-block;
+      background: #fce8e6;
+      color: #d93025;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-weight: bold;
+    }
+    .left {
+      text-align: left;
+      white-space: nowrap;
+    }
+  </style>
 </head>
-<body style="background: yellow; font-size: 40px; padding: 40px;">
-  TEST 123 成功
+<body>
+  <div class="container">
+    <h1>Lotto 6/49 號碼走勢分析</h1>
+    <div class="sub">主號碼 + 白波 + Gold 波</div>
+
+    <div id="status" class="msg">正在讀取 data.csv...</div>
+
+    <div class="table-wrap" id="table-wrap"></div>
+  </div>
+
+  <script>
+    const csvUrl = "data.csv?t=" + Date.now();
+
+    function safe(v) {
+      return v === undefined || v === null || v === "" ? "-" : v;
+    }
+
+    Papa.parse(csvUrl, {
+      download: true,
+      header: true,
+      skipEmptyLines: true,
+      complete: function(results) {
+        const rows = (results.data || []).filter(r => r.date && r.n1);
+
+        if (!rows.length) {
+          document.getElementById("status").innerText = "讀到 data.csv，但冇有效資料。";
+          document.getElementById("table-wrap").innerHTML = "";
+          return;
+        }
+
+        document.getElementById("status").innerText = "成功讀取 data.csv。";
+
+        let html = `
+          <table>
+            <thead>
+              <tr>
+                <th>日期</th>
+                <th>主號碼</th>
+                <th>白波</th>
+                <th>Gold 波</th>
+                <th>完整 Result</th>
+                <th>單雙</th>
+                <th>連續</th>
+                <th>重複</th>
+                <th>分區</th>
+              </tr>
+            </thead>
+            <tbody>
+        `;
+
+        rows.forEach(row => {
+          let ballsHtml = "";
+          for (let i = 1; i <= 6; i++) {
+            ballsHtml += `<span class="ball main-ball">${safe(row["n" + i])}</span>`;
+          }
+
+          const whiteHtml = row.white && row.white !== "-"
+            ? `<span class="ball white-ball">${row.white}</span>`
+            : "-";
+
+          const goldHtml = row.gold && row.gold !== "-"
+            ? `<span class="ball gold-ball">${row.gold}</span>`
+            : "-";
+
+          const resultText = row.result && row.result.trim()
+            ? row.result
+            : [
+                row.n1, row.n2, row.n3, row.n4, row.n5, row.n6
+              ].filter(Boolean).join(" - ");
+
+          const consecClass = row.consecutive === "Yes" ? "yes" : "no";
+
+          html += `
+            <tr>
+              <td><strong>${safe(row.date)}</strong></td>
+              <td><div class="balls">${ballsHtml}</div></td>
+              <td>${whiteHtml}</td>
+              <td>${goldHtml}</td>
+              <td class="left">${safe(resultText)}</td>
+              <td>${safe(row.odd_even)}</td>
+              <td><span class="${consecClass}">${safe(row.consecutive)}</span></td>
+              <td>${safe(row.repeats)}個</td>
+              <td>${safe(row.zone)}</td>
+            </tr>
+          `;
+        });
+
+        html += "</tbody></table>";
+        document.getElementById("table-wrap").innerHTML = html;
+      },
+      error: function(err) {
+        document.getElementById("status").innerText = "讀取 data.csv 失敗。";
+        document.getElementById("table-wrap").innerHTML = "";
+        console.error(err);
+      }
+    });
+  </script>
 </body>
 </html>
