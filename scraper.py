@@ -6,6 +6,7 @@ import re
 
 def scrape_real_649_data():
     all_draws = []
+    # 專注去你搵到嘅 lottomaxnumbers 大寶藏，淨係抄核心號碼！
     urls = [
         "https://www.lottomaxnumbers.com/lotto-649/past-numbers",
         "https://www.lottomaxnumbers.com/lotto-649/numbers/2026",
@@ -17,7 +18,7 @@ def scrape_real_649_data():
     }
     
     for url in urls:
-        print(f"📡 極速掃描: {url}")
+        print(f"📡 極速抓取核心號碼: {url}")
         try:
             resp = requests.get(url, headers=headers, timeout=10)
             if resp.status_code != 200: continue
@@ -25,10 +26,11 @@ def scrape_real_649_data():
             soup = BeautifulSoup(resp.text, 'html.parser')
             for row in soup.find_all('tr'):
                 cols = row.find_all(['td', 'th'])
-                if len(cols) >= 3:
+                if len(cols) >= 2:
                     date_str = cols[0].get_text(" ", strip=True)
                     if not re.search(r'202[4-9]', date_str): continue
                     
+                    # 1. 抽 6 個核心主波 (呢個一定準！)
                     nums_found = []
                     for b in cols[1].find_all(['li', 'span', 'div']):
                         txt = b.get_text(strip=True)
@@ -42,37 +44,20 @@ def scrape_real_649_data():
                     if len(nums_found) >= 6:
                         main_balls = sorted(nums_found[:6])
                         clean_date = re.sub(r'(?i)latest|\*', '', date_str).strip()
-                        
-                        # 🌟 智能獎金過濾系統啟動
-                        prize_text = cols[2].get_text(" ", strip=True)
-                        
-                        # 搵晒同一格入面所有嘅金錢數字出嚟
-                        money_matches = re.findall(r'\$[0-9,]+(?:\s*Million)?', prize_text, re.IGNORECASE)
-                        
-                        gold_prize = "-"
-                        if money_matches:
-                            # 篩走 "5 Million" 或者 "5,000,000" (因為呢個係死數 Classic Draw)
-                            filtered = [m for m in money_matches if '5,000,000' not in m and '5 Million' not in m]
-                            
-                            if filtered:
-                                gold_prize = filtered[-1] # 攞最後嗰個，即係真正嘅 Gold Ball 獎金
-                            else:
-                                gold_prize = money_matches[-1] # 萬一真係得返一個，就照殺
-                        else:
-                            gold_prize = prize_text[:20] if prize_text else "-"
                             
                         all_draws.append({
                             'date': clean_date,
                             'n1': main_balls[0], 'n2': main_balls[1], 'n3': main_balls[2],
-                            'n4': main_balls[3], 'n5': main_balls[4], 'n6': main_balls[5],
-                            'gold_prize': gold_prize
+                            'n4': main_balls[3], 'n5': main_balls[4], 'n6': main_balls[5]
+                            # ✅ 剷除晒金波、白波、獎金、號碼！
                         })
         except Exception as e:
-            print(f"⚠️ 錯誤: {e}")
+            print(f"⚠️ 核心錯誤: {e}")
             
     df = pd.DataFrame(all_draws)
     if not df.empty:
         df['date_obj'] = pd.to_datetime(df['date'], errors='coerce')
+        # 剷走重複日期，由舊排到新 (方便計統計)
         return df.dropna(subset=['date_obj']).drop_duplicates('date_obj').sort_values('date_obj', ascending=True)
     return pd.DataFrame()
 
@@ -81,6 +66,7 @@ def calculate_metrics(df):
     prev_numbers = set()
     results = []
     
+    # 由舊到新行，計連續同重複
     for _, row in df.iterrows():
         nums = [int(row[f'n{i}']) for i in range(1, 7)]
         row['odd_even'] = f"{sum(1 for n in nums if n%2!=0)}單 {sum(1 for n in nums if n%2==0)}雙"
@@ -94,19 +80,20 @@ def calculate_metrics(df):
         row['zone'] = f"{len(zones)}個區 ({','.join(map(str, zones))})"
         results.append(row)
         
+    # 計完，排返最新到最舊出 CSV
     final_df = pd.DataFrame(results).sort_values('date_obj', ascending=False)
     final_df['date'] = final_df['date_obj'].dt.strftime('%Y-%m-%d')
     return final_df
 
 def main():
-    print("🚀 啟動 Lotto 6/49 智能獎金追蹤爬蟲 (完美過濾 Classic 5M)...")
+    print("🚀 啟動 Lotto 6/49 核心號碼走勢爬蟲 (只攻不守)...")
     raw_df = scrape_real_649_data()
     
     if not raw_df.empty:
         final_df = calculate_metrics(raw_df)
-        cols = ['date','n1','n2','n3','n4','n5','n6','gold_prize','odd_even','consecutive','repeats','zone']
+        cols = ['date','n1','n2','n3','n4','n5','n6','odd_even','consecutive','repeats','zone']
         final_df[cols].to_csv('data.csv', index=False)
-        print(f"✅ 極速搞掂！成功寫入 {len(final_df)} 期數據。")
+        print(f"✅ 極速搞掂！成功寫入 {len(final_df)} 期核心數據。")
     else:
         print("❌ 警告：搵唔到數據！強制終止。")
         exit(1)
