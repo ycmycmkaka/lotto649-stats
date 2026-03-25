@@ -10,10 +10,11 @@ HEADERS = {
 
 BASE_URL = "https://ca.lottonumbers.com"
 LIST_URLS = [
-    "https://ca.lottonumbers.com/lotto-649/past-numbers",
-    "https://ca.lottonumbers.com/lotto-649/past-numbers/2026",
-    "https://ca.lottonumbers.com/lotto-649/past-numbers/2025",
-    "https://ca.lottonumbers.com/lotto-649/past-numbers/2024",
+    "https://ca.lottonumbers.com/lotto-649/numbers/2026",
+    "https://ca.lottonumbers.com/lotto-649/numbers/2025",
+    "https://ca.lottonumbers.com/lotto-649/numbers/2024",
+    "https://ca.lottonumbers.com/lotto-649/numbers/2023",
+    "https://ca.lottonumbers.com/lotto-649/numbers/2022",
 ]
 
 MONTHS = r"(January|February|March|April|May|June|July|August|September|October|November|December)"
