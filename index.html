@@ -110,7 +110,7 @@
 
     table {
       width: 100%;
-      min-width: 1380px;
+      min-width: 1300px;
       border-collapse: collapse;
     }
 
@@ -167,6 +167,7 @@
       width: auto;
       padding: 0 12px;
       border-radius: 18px;
+      font-weight: bold;
     }
 
     .yes {
@@ -187,11 +188,6 @@
       font-weight: bold;
     }
 
-    .left {
-      text-align: left;
-      white-space: nowrap;
-    }
-
     .muted {
       color: #888;
     }
@@ -200,6 +196,31 @@
       font-weight: bold;
       color: #555;
       white-space: nowrap;
+    }
+
+    .result-ball {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      font-size: 16px;
+      font-weight: bold;
+      line-height: 1;
+    }
+
+    .white-result-ball {
+      background: #fff;
+      border: 1px solid #cfcfcf;
+      color: #555;
+      box-shadow: inset 0 0 0 1px #f3f3f3;
+    }
+
+    .gold-result-ball {
+      background: #f4c542;
+      border: 1px solid #c89f19;
+      color: #222;
     }
 
     @media (max-width: 700px) {
@@ -249,6 +270,20 @@
       return h + `</div>`;
     }
 
+    function renderGoldResultIcon(v) {
+      const text = String(v || "").toLowerCase();
+
+      if (text.includes("white ball")) {
+        return `<span class="result-ball white-result-ball" title="White Ball $1 Million">⚪</span>`;
+      }
+
+      if (text.includes("gold ball jackpot won")) {
+        return `<span class="result-ball gold-result-ball" title="Gold Ball Jackpot Won">🟡</span>`;
+      }
+
+      return `<span class="muted">-</span>`;
+    }
+
     Papa.parse(csvUrl, {
       download: true,
       header: true,
@@ -269,8 +304,7 @@
           oddEven: {},
           consecutive: { Yes: 0, No: 0 },
           repeats: { "0個": 0, "1個": 0, "2個+": 0 },
-          zones: {},
-          goldPrize: {}
+          zones: {}
         };
 
         rows.forEach(row => {
@@ -291,7 +325,6 @@
             const z = String(row.zone).charAt(0) + "個區";
             stats.zones[z] = (stats.zones[z] || 0) + 1;
           }
-
         });
 
         document.getElementById("dashboard-container").innerHTML = `
@@ -345,7 +378,7 @@
               <td>${bonusHtml}</td>
               <td>${goldBallHtml}</td>
               <td>${safe(row.gold_prize_type)}</td>
-              <td class="left">${safe(row.gold_result)}</td>
+              <td>${renderGoldResultIcon(row.gold_result)}</td>
               <td>${safe(row.odd_even)}</td>
               <td><span class="${consecClass}">${safe(row.consecutive)}</span></td>
               <td>${safe(row.repeats)}個</td>
