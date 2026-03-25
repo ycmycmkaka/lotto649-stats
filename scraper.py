@@ -52,35 +52,43 @@ def scrape_real_649_data():
                         
                         # 大表嘅初步判斷
                         prize_col_text = cols[2].get_text(" ").lower()
-                        b_type = "White" if "white" in prize_col_text else "Gold"
+                        b_type = "White" if "white" in prize_col_text else ("Gold" if "gold" in prize_col_text else "?")
                         pm = re.search(r'\d{8,10}-\d{2}', prize_col_text)
                         gold_no = pm.group(0) if pm else "-"
                         
-                        # 🌟 特工模式啟動：如果大表無號碼，就「撳入去」詳細頁面搵！
-                        if gold_no == "-":
+                        # 🌟 特工模式 2.0：直接喺大表條 Link 撳入去！
+                        if gold_no == "-" or b_type == "?":
                             try:
-                                # 將 "Mar 21, 2026" 變成 "21-03-2026"
-                                date_obj = datetime.strptime(clean_date, "%b %d, %Y")
-                                url_date = date_obj.strftime("%d-%m-%Y")
-                                
-                                detail_url = f"https://www.lottomaxnumbers.com/lotto-649/numbers/{url_date}"
-                                detail_resp = requests.get(detail_url, headers=headers, timeout=5)
-                                
-                                if detail_resp.status_code == 200:
-                                    detail_text = BeautifulSoup(detail_resp.text, 'html.parser').get_text(" ", strip=True).lower()
-                                    
-                                    # 深入尋找金白波字眼
-                                    if "white ball" in detail_text or "white" in detail_text:
-                                        b_type = "White"
-                                    elif "gold ball" in detail_text:
-                                        b_type = "Gold"
+                                link = row.find('a') # 自動搵隱藏嘅網址
+                                detail_url = ""
+                                if link and link.has_attr('href'):
+                                    detail_url = link['href']
+                                    if not detail_url.startswith('http'):
+                                        detail_url = "https://www.lottomaxnumbers.com" + detail_url
                                         
-                                    # 深入尋找 12345678-01 號碼
-                                    pm_detail = re.search(r'\b\d{8,10}-\d{2}\b', detail_text)
-                                    if pm_detail:
-                                        gold_no = pm_detail.group(0)
+                                if detail_url:
+                                    print(f"   🕵️ 潛入分析: {clean_date}")
+                                    detail_resp = requests.get(detail_url, headers=headers, timeout=10)
+                                    if detail_resp.status_code == 200:
+                                        detail_soup = BeautifulSoup(detail_resp.text, 'html.parser')
+                                        # 將成個網頁嘅字變細階，方便搵
+                                        detail_text = detail_soup.get_text(" ", strip=True).lower()
+                                        
+                                        # 搵 12345678-01 呢種格式嘅號碼
+                                        pm_detail = re.search(r'\b\d{8,10}-\d{2}\b', detail_text)
+                                        if pm_detail:
+                                            gold_no = pm_detail.group(0)
+                                            
+                                        # 搵係咪白波 (通常白波會寫明 "white ball")
+                                        if "white ball" in detail_text or "white" in detail_text:
+                                            b_type = "White"
+                                        elif "gold ball" in detail_text:
+                                            b_type = "Gold"
                             except Exception as e:
-                                pass # 萬一詳細頁面出錯，就繼續用預設值，唔會死機
+                                pass # 潛入失敗都唔會死機，繼續行
+                                
+                        # 如果全部都搵唔到，按機率預設為白波
+                        if b_type == "?": b_type = "White"
                         
                         all_draws.append({
                             'date': clean_date,
@@ -121,7 +129,7 @@ def calculate_metrics(df):
     return final_df
 
 def main():
-    print("🚀 啟動 Lotto 6/49 神級特工爬蟲 (自動潛入詳細頁面)...")
+    print("🚀 啟動 Lotto 6/49 神級特工爬蟲 2.0 (自動追蹤導航)...")
     raw_df = scrape_real_649_data()
     
     if not raw_df.empty:
