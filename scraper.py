@@ -2,115 +2,118 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 import re
-from datetime import datetime
 
-URLS = [
-    "https://www.lottomaxnumbers.com/lotto-649/past-numbers",
-    "https://www.lottomaxnumbers.com/lotto-649/numbers/2026",
-    "https://www.lottomaxnumbers.com/lotto-649/numbers/2025",
-    "https://www.lottomaxnumbers.com/lotto-649/numbers/2024"
-]
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    "User-Agent": "Mozilla/5.0"
 }
 
+LOTTOMAX_URLS = [
+    "https://www.lottomaxnumbers.com/lotto-649/numbers/2026",
+    "https://www.lottomaxnumbers.com/lotto-649/numbers/2025",
+    "https://www.lottomaxnumbers.com/lotto-649/numbers/2024",
+]
 
-def clean_text(text: str) -> str:
-    return re.sub(r"\s+", " ", text).strip()
-
-
-def parse_date(text: str):
-    text = clean_text(text)
-
-    patterns = [
-        (r"\b\d{4}-\d{2}-\d{2}\b", "%Y-%m-%d"),
-        (r"\b\d{2}/\d{2}/\d{4}\b", "%d/%m/%Y"),
-        (r"\b[A-Z][a-z]{2,9}\s+\d{1,2},\s+\d{4}\b", "%B %d, %Y"),
-        (r"\b[A-Z][a-z]{2}\s+\d{1,2},\s+\d{4}\b", "%b %d, %Y"),
-        (r"\b\d{1,2}\s+[A-Z][a-z]{2,9}\s+\d{4}\b", "%d %B %Y"),
-        (r"\b\d{1,2}\s+[A-Z][a-z]{2}\s+\d{4}\b", "%d %b %Y"),
-    ]
-
-    for pattern, fmt in patterns:
-        m = re.search(pattern, text)
-        if m:
-            raw = m.group(0)
-            try:
-                dt = datetime.strptime(raw, fmt)
-                return dt.strftime("%Y-%m-%d"), raw
-            except ValueError:
-                continue
-
-    return None, None
+OLG_URL = "https://www.olg.ca/en/lottery/play-lotto-649-encore/past-results.html"
 
 
-def extract_labeled_number(text: str, labels):
-    for label in labels:
-        pattern = rf"(?i)\b{label}\b[^0-9]{{0,20}}(\d{{1,2}})"
-        m = re.search(pattern, text)
-        if m:
-            n = int(m.group(1))
-            if 1 <= n <= 99:
-                return n
-    return None
+def fetch_text(url: str) -> str:
+    r = requests.get(url, headers=HEADERS, timeout=25)
+    r.raise_for_status()
+    soup = BeautifulSoup(r.text, "html.parser")
+    return soup.get_text("\n", strip=True)
 
 
-def extract_main_bonus_gold(text: str, date_raw: str = None):
-    working = text
+def parse_lottomax_text(text: str):
+    """
+    由 lottomaxnumbers 抽：
+    date + 6 個主號碼 + bonus(第7個)
+    """
+    draws = []
 
-    if date_raw:
-        working = working.replace(date_raw, " ")
-
-    # 移除年份，避免 2026 呢啲污染
-    working = re.sub(r"\b20\d{2}\b", " ", working)
-
-    # 先試圖搵 label
-    white_ball = extract_labeled_number(
-        working,
-        ["white", "bonus", "bonus ball", "extra", "complementary"]
+    # 例：
+    # February 25 2026
+    # 17 24 32 37 46 49 43
+    pattern = re.compile(
+        r"(January|February|March|April|May|June|July|August|September|October|November|December)"
+        r"\s+(\d{1,2})\s+(20\d{2})"
+        r"(.*?)"
+        r"(?=(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}\s+20\d{2}|$)",
+        re.S
     )
 
-    gold_ball = extract_labeled_number(
-        working,
-        ["gold", "gold ball", "g"]
-    )
+    for m in pattern.finditer(text):
+        month = m.group(1)
+        day = m.group(2)
+        year = m.group(3)
+        block = m.group(4)
 
-    # 抽所有 1-99 數字
-    raw_nums = [int(x) for x in re.findall(r"\b\d{1,2}\b", working) if 1 <= int(x) <= 99]
+        nums = [int(x) for x in re.findall(r"\b([1-9]|[1-4]\d)\b", block)]
 
-    # 去重，但保留次序
-    ordered_unique = []
-    for n in raw_nums:
-        if n not in ordered_unique:
-            ordered_unique.append(n)
+        # 去重但保留次序
+        ordered = []
+        for n in nums:
+            if n not in ordered:
+                ordered.append(n)
 
-    if len(ordered_unique) < 6:
-        return None
+        if len(ordered) >= 7:
+            main = sorted(ordered[:6])
+            bonus = ordered[6]
+            date = pd.to_datetime(f"{month} {day} {year}", errors="coerce")
+            if pd.notna(date):
+                draws.append({
+                    "date": date.strftime("%Y-%m-%d"),
+                    "n1": main[0],
+                    "n2": main[1],
+                    "n3": main[2],
+                    "n4": main[3],
+                    "n5": main[4],
+                    "n6": main[5],
+                    "white": bonus,   # 你網站叫白波
+                    "result": f"{main[0]} - {main[1]} - {main[2]} - {main[3]} - {main[4]} - {main[5]} | White {bonus}"
+                })
 
-    main_balls = ordered_unique[:6]
-
-    # 如果 label 搵唔到，就用第 7 / 8 個數估
-    if white_ball is None and len(ordered_unique) >= 7:
-        white_ball = ordered_unique[6]
-
-    if gold_ball is None and len(ordered_unique) >= 8:
-        gold_ball = ordered_unique[7]
-
-    return {
-        "main": sorted(main_balls),
-        "white": white_ball,
-        "gold": gold_ball
-    }
+    return draws
 
 
-def build_result_text(main, white_ball=None, gold_ball=None):
-    parts = [" - ".join(str(n) for n in main)]
-    if white_ball is not None:
-        parts.append(f"White {white_ball}")
-    if gold_ball is not None:
-        parts.append(f"Gold {gold_ball}")
-    return " | ".join(parts)
+def parse_olg_goldball(text: str):
+    """
+    由 OLG past results 抽：
+    date -> Gold Ball
+    """
+    gold_map = {}
+
+    # 例搜尋摘要格式：
+    # 02. 16. 18. 37. 39. 41. Bonus. 47. GOLD BALL. $1 Million 53673602-09.
+    # 加埋日期通常會喺附近，例如 March 21, 2026
+    blocks = re.split(r"(?=(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s+20\d{2})", text)
+
+    rebuilt = []
+    i = 0
+    while i < len(blocks):
+        if i + 2 < len(blocks) and re.fullmatch(r"(January|February|March|April|May|June|July|August|September|October|November|December)", str(blocks[i + 1] or "")):
+            rebuilt.append(blocks[i + 1] + blocks[i + 2])
+            i += 3
+        else:
+            i += 1
+
+    for block in rebuilt:
+        dm = re.search(
+            r"(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),\s+(20\d{2})",
+            block
+        )
+        if not dm:
+            continue
+
+        date = pd.to_datetime(f"{dm.group(1)} {dm.group(2)} {dm.group(3)}", errors="coerce")
+        if pd.isna(date):
+            continue
+
+        gm = re.search(r"GOLD BALL\.?\s*(?:\$[\d,]+\s+)?([0-9]{8,10}(?:-[0-9]{2})?)", block, re.I)
+        if gm:
+            gold_map[date.strftime("%Y-%m-%d")] = gm.group(1)
+
+    return gold_map
 
 
 def scrape_real_649_data():
@@ -118,70 +121,45 @@ def scrape_real_649_data():
 
     print("🚀 啟動 Lotto 6/49 爬蟲...")
 
-    for url in URLS:
-        print(f"📡 抓取: {url}")
+    for url in LOTTOMAX_URLS:
+        print(f"📡 抓取主號碼/白波: {url}")
         try:
-            resp = requests.get(url, headers=HEADERS, timeout=20)
-            if resp.status_code != 200:
-                print(f"⚠️ HTTP {resp.status_code}")
-                continue
-
-            soup = BeautifulSoup(resp.text, "html.parser")
-
-            candidates = []
-            candidates.extend(soup.find_all("tr"))
-            candidates.extend(soup.find_all("article"))
-            candidates.extend(soup.find_all("section"))
-            candidates.extend(soup.find_all("div"))
-
-            seen_text = set()
-
-            for node in candidates:
-                row_text = clean_text(node.get_text(" ", strip=True))
-                if not row_text or len(row_text) < 20:
-                    continue
-                if row_text in seen_text:
-                    continue
-                seen_text.add(row_text)
-
-                clean_date, raw_date = parse_date(row_text)
-                if not clean_date:
-                    continue
-
-                parsed = extract_main_bonus_gold(row_text, raw_date)
-                if not parsed:
-                    continue
-
-                main_balls = parsed["main"]
-                white_ball = parsed["white"]
-                gold_ball = parsed["gold"]
-
-                all_draws.append({
-                    "date": clean_date,
-                    "n1": main_balls[0],
-                    "n2": main_balls[1],
-                    "n3": main_balls[2],
-                    "n4": main_balls[3],
-                    "n5": main_balls[4],
-                    "n6": main_balls[5],
-                    "white": white_ball,
-                    "gold": gold_ball,
-                    "result": build_result_text(main_balls, white_ball, gold_ball),
-                    "source_url": url
-                })
-
+            text = fetch_text(url)
+            draws = parse_lottomax_text(text)
+            all_draws.extend(draws)
+            print(f"   ✅ 抽到 {len(draws)} 期")
         except Exception as e:
-            print(f"⚠️ 抓取失敗: {e}")
+            print(f"   ⚠️ 失敗: {e}")
 
     df = pd.DataFrame(all_draws)
-
     if df.empty:
         return pd.DataFrame()
 
     df["date_obj"] = pd.to_datetime(df["date"], errors="coerce")
     df = df.dropna(subset=["date_obj"])
-    df = df.drop_duplicates(subset=["date"]).sort_values("date_obj", ascending=True)
+    df = df.sort_values("date_obj").drop_duplicates(subset=["date"], keep="last")
 
+    # Gold Ball
+    try:
+        print(f"📡 抓取 Gold Ball: {OLG_URL}")
+        olg_text = fetch_text(OLG_URL)
+        gold_map = parse_olg_goldball(olg_text)
+        df["gold"] = df["date"].map(gold_map)
+    except Exception as e:
+        print(f"   ⚠️ Gold Ball 抽取失敗: {e}")
+        df["gold"] = ""
+
+    # 補 result
+    def build_result(row):
+        main = [row[f"n{i}"] for i in range(1, 7)]
+        txt = " - ".join(str(int(x)) for x in main)
+        if pd.notna(row.get("white")) and str(row.get("white")).strip() != "":
+            txt += f" | White {row['white']}"
+        if pd.notna(row.get("gold")) and str(row.get("gold")).strip() != "":
+            txt += f" | Gold {row['gold']}"
+        return txt
+
+    df["result"] = df.apply(build_result, axis=1)
     return df
 
 
@@ -196,12 +174,8 @@ def calculate_metrics(df):
         record = row.to_dict()
         nums = [int(record[f"n{i}"]) for i in range(1, 7)]
 
-        odd_count = sum(1 for n in nums if n % 2 != 0)
-        even_count = sum(1 for n in nums if n % 2 == 0)
-        record["odd_even"] = f"{odd_count}單 {even_count}雙"
-
-        nums_sorted = sorted(nums)
-        record["consecutive"] = "Yes" if any(nums_sorted[i + 1] - nums_sorted[i] == 1 for i in range(5)) else "No"
+        record["odd_even"] = f"{sum(1 for n in nums if n % 2 != 0)}單 {sum(1 for n in nums if n % 2 == 0)}雙"
+        record["consecutive"] = "Yes" if any(sorted(nums)[i + 1] - sorted(nums)[i] == 1 for i in range(5)) else "No"
 
         curr_set = set(nums)
         record["repeats"] = len(curr_set.intersection(prev_numbers)) if prev_numbers else 0
@@ -230,8 +204,7 @@ def main():
         "date",
         "n1", "n2", "n3", "n4", "n5", "n6",
         "white", "gold", "result",
-        "odd_even", "consecutive", "repeats", "zone",
-        "source_url"
+        "odd_even", "consecutive", "repeats", "zone"
     ]
 
     for c in cols:
