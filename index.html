@@ -292,10 +292,6 @@
             stats.zones[z] = (stats.zones[z] || 0) + 1;
           }
 
-          const gp = row.gold_prize_type && String(row.gold_prize_type).trim()
-            ? String(row.gold_prize_type).trim()
-            : "未提供";
-          stats.goldPrize[gp] = (stats.goldPrize[gp] || 0) + 1;
         });
 
         document.getElementById("dashboard-container").innerHTML = `
@@ -304,7 +300,6 @@
             ${drawCard("連續號碼", stats.consecutive, total, "#1e8e3e")}
             ${drawCard("上期重複", stats.repeats, total, "#d93025")}
             ${drawCard("分區數量", stats.zones, total, "#d93025")}
-            ${drawCard("Gold Prize", stats.goldPrize, total, "#c89f19")}
           </div>
         `;
 
