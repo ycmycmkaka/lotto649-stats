@@ -113,30 +113,23 @@ def parse_listing_page(text: str):
 def parse_detail_page(text: str):
     result = {
         "classic_jackpot": "",
-        "gold_prize_type": "",         # Gold Ball Jackpot amount, e.g. $14,000,000
-        "gold_result": "",             # outcome summary
-        "gold_next_jackpot": "",       # Next Gold Ball Jackpot
+        "gold_prize_type": "",         
+        "gold_result": "",             
+        "gold_next_jackpot": "",       
     }
 
-    # Classic jackpot
     m = re.search(r"Jackpot:\s*\$([0-9,]+)", text, re.I)
     if m:
         result["classic_jackpot"] = f"${m.group(1)}"
 
-    # Gold Ball jackpot shown in header
     gm = re.search(r"Gold Ball Jackpot:\s*\$([0-9,]+)", text, re.I)
     if gm:
         result["gold_prize_type"] = f"${gm.group(1)}"
 
-    # Next Gold Ball jackpot
     nm = re.search(r"Next Gold Ball Jackpot\s*-\s*-\s*\$([0-9,]+)", text, re.I)
     if nm:
         result["gold_next_jackpot"] = f"${nm.group(1)}"
 
-    # payout row for Gold Ball outcome
-    # example:
-    # Gold Ball Jackpot $1,000,000  1 $1,000,000
-    # or if jackpot won, prize could equal the header jackpot
     payout = re.search(
         r"Gold Ball Jackpot\s+\$([0-9,]+)\s+([0-9,]+)\s+\$([0-9,]+)",
         text,
@@ -169,10 +162,8 @@ def parse_detail_page(text: str):
 
 def scrape_real_649_data():
     all_draws = []
-
     print("🚀 啟動 Lotto 6/49 爬蟲...")
 
-    # Step 1: 抓主列表
     for url in LIST_URLS:
         print(f"📡 抓主列表: {url}")
         try:
@@ -191,13 +182,11 @@ def scrape_real_649_data():
     df = df.dropna(subset=["date_obj"])
     df = df.sort_values("date_obj").drop_duplicates(subset=["date"], keep="first")
 
-    # 預設欄位
     df["classic_jackpot"] = ""
     df["gold_prize_type"] = ""
     df["gold_result"] = ""
     df["gold_next_jackpot"] = ""
 
-    # Step 2: 逐期入 details page 補 Gold Ball 真資料
     for idx, row in df.iterrows():
         url = row["detail_url"]
         print(f"🔎 詳情頁: {row['date']} -> {url}")
@@ -234,7 +223,12 @@ def calculate_metrics(df):
         record["odd_even"] = f"{odd_count}單 {even_count}雙"
 
         sorted_nums = sorted(nums)
-        record["consecutive"] = "Yes" if any(sorted_nums[i + 1] - sorted_nums[i] == 1 for i in range(5)) else "No"
+        # 🌟 升級：精準計算連續數量
+        consec_count = 0
+        for i in range(5):
+            if sorted_nums[i + 1] - sorted_nums[i] == 1:
+                consec_count += 1
+        record["consecutive"] = f"{consec_count} 個連續"
 
         curr_set = set(nums)
         record["repeats"] = len(curr_set.intersection(prev_numbers)) if prev_numbers else 0
