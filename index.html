@@ -6,27 +6,45 @@
   <title>Lotto 6/49 號碼走勢分析</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
   <style>
+    :root {
+      --red: #d93025;
+      --red-soft: #fce8e6;
+      --red-bg: #fffcfc;
+      --green: #1e8e3e;
+      --green-soft: #e6f4ea;
+      --gold: #f4c542;
+      --gold-border: #c89f19;
+      --text: #333;
+      --muted: #666;
+      --panel: #ffffff;
+      --bg: #f8f8f8;
+      --border: #eee;
+      --shadow: 0 2px 14px rgba(0,0,0,0.08);
+    }
+
+    * { box-sizing: border-box; }
+
     body {
       font-family: Arial, sans-serif;
-      background: #f8f8f8;
+      background: var(--bg);
       margin: 0;
       padding: 20px;
-      color: #333;
+      color: var(--text);
     }
 
     .container {
-      max-width: 1350px;
+      max-width: 1450px;
       margin: 0 auto;
       background: #fff;
       border-radius: 14px;
       padding: 24px;
-      box-shadow: 0 2px 14px rgba(0,0,0,0.08);
+      box-shadow: var(--shadow);
     }
 
     h1 {
       margin: 0 0 8px;
       text-align: center;
-      color: #d93025;
+      color: var(--red);
       font-size: 34px;
     }
 
@@ -45,15 +63,45 @@
       margin-bottom: 18px;
       font-weight: bold;
       text-align: center;
+      line-height: 1.6;
     }
 
-    .dashboard {
+    .summary-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 15px;
       margin-bottom: 20px;
     }
 
+    .summary-card {
+      background: #fffcfc;
+      border: 1px solid #fce8e6;
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .summary-label {
+      color: #8c8c8c;
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+
+    .summary-value {
+      color: var(--red);
+      font-size: 28px;
+      font-weight: 800;
+      line-height: 1.2;
+      word-break: break-word;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .number-card,
     .stat-card {
       background: #fffcfc;
       border: 1px solid #fce8e6;
@@ -61,13 +109,58 @@
       padding: 15px;
     }
 
+    .number-card h3,
     .stat-card h3 {
       margin: 0 0 10px 0;
       font-size: 15px;
-      color: #d93025;
+      color: var(--red);
       border-bottom: 2px solid #fce8e6;
       padding-bottom: 6px;
       text-align: center;
+    }
+
+    .number-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .number-box {
+      background: #fff;
+      border: 1px solid #f3d3cf;
+      border-radius: 12px;
+      padding: 12px 6px;
+      text-align: center;
+    }
+
+    .number-box .n {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--red);
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+
+    .number-box .t {
+      font-size: 12px;
+      color: #666;
+      font-weight: 700;
+      line-height: 1.3;
+    }
+
+    .empty-note {
+      color: #888;
+      text-align: center;
+      font-size: 13px;
+      font-weight: bold;
+      padding: 10px 0;
+    }
+
+    .dashboard {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 15px;
+      margin-bottom: 20px;
     }
 
     .bar-row {
@@ -94,7 +187,7 @@
     .bar-fill {
       height: 100%;
       border-radius: 5px;
-      background: #d93025;
+      background: var(--red);
     }
 
     .bar-pct {
@@ -116,13 +209,14 @@
     }
 
     th {
-      background: #d93025;
+      background: var(--red);
       color: white;
       padding: 12px 8px;
       text-align: center;
       white-space: nowrap;
       position: sticky;
       top: 0;
+      z-index: 10;
     }
 
     td {
@@ -150,8 +244,8 @@
 
     .main-ball {
       background: #fff;
-      color: #d93025;
-      border: 1px solid #d93025;
+      color: var(--red);
+      border: 1px solid var(--red);
     }
 
     .bonus-ball {
@@ -161,9 +255,9 @@
     }
 
     .gold-ball {
-      background: #f4c542;
+      background: var(--gold);
       color: #222;
-      border: 1px solid #c89f19;
+      border: 1px solid var(--gold-border);
       min-width: 88px;
       width: auto;
       padding: 0 12px;
@@ -173,8 +267,8 @@
 
     .yes {
       display: inline-block;
-      background: #e6f4ea;
-      color: #1e8e3e;
+      background: var(--green-soft);
+      color: var(--green);
       padding: 4px 8px;
       border-radius: 6px;
       font-weight: bold;
@@ -183,8 +277,8 @@
 
     .no {
       display: inline-block;
-      background: #fce8e6;
-      color: #d93025;
+      background: var(--red-soft);
+      color: var(--red);
       padding: 4px 8px;
       border-radius: 6px;
       font-weight: bold;
@@ -221,15 +315,24 @@
     }
 
     .gold-result-ball {
-      background: #f4c542;
-      border: 1px solid #c89f19;
+      background: var(--gold);
+      border: 1px solid var(--gold-border);
       color: #222;
     }
 
+    @media (max-width: 1200px) {
+      .summary-grid,
+      .dashboard { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .feature-grid { grid-template-columns: 1fr; }
+    }
+
     @media (max-width: 700px) {
-      h1 {
-        font-size: 28px;
-      }
+      body { padding: 10px; }
+      .container { padding: 14px; }
+      h1 { font-size: 28px; }
+      .summary-grid,
+      .dashboard { grid-template-columns: 1fr; }
+      .number-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     }
   </style>
 </head>
@@ -239,6 +342,42 @@
     <div class="sub">Classic 主號碼 + Bonus + Gold Ball</div>
 
     <div id="status" class="msg">正在連接資料庫...</div>
+
+    <div class="summary-grid">
+      <div class="summary-card">
+        <div class="summary-label">總期數</div>
+        <div class="summary-value" id="totalDraws">-</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">最熱門主號碼</div>
+        <div class="summary-value" id="topMain">-</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">最常見分區</div>
+        <div class="summary-value" id="topZone">-</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">資料檔</div>
+        <div class="summary-value" style="font-size:22px;">data.csv</div>
+      </div>
+    </div>
+
+    <div class="feature-grid">
+      <div class="number-card">
+        <h3>最熱門主號碼 Top 5</h3>
+        <div class="number-grid" id="hotMainNumbers"></div>
+      </div>
+
+      <div class="number-card">
+        <h3>最冷門主號碼 Top 5</h3>
+        <div class="number-grid" id="coldMainNumbers"></div>
+      </div>
+
+      <div class="number-card">
+        <h3>連續 15 期或以上未開號碼</h3>
+        <div class="number-grid" id="missingLongGrid"></div>
+      </div>
+    </div>
 
     <div id="dashboard-container"></div>
     <div class="table-wrap" id="table-wrap"></div>
@@ -259,11 +398,10 @@
 
       sorted.forEach(([label, count]) => {
         const pct = total ? Math.round((count / total) * 100) : 0;
-        
-        // 🌟 智能顏色：連續次數卡片，0個就紅色，有連續就綠色
+
         let barColor = color;
         if (title === "連續號碼數量") {
-            barColor = label.includes("0") ? "#d93025" : "#1e8e3e";
+          barColor = label.includes("0") ? "#d93025" : "#1e8e3e";
         }
 
         h += `
@@ -294,7 +432,51 @@
       return `<span class="muted">-</span>`;
     }
 
-    // 🌟 獲取檔案最後更新時間
+    function renderNumberBoxes(containerId, items, suffix, emptyText = "") {
+      const el = document.getElementById(containerId);
+      if (!items.length) {
+        el.innerHTML = `<div class="empty-note">${emptyText}</div>`;
+        return;
+      }
+
+      el.innerHTML = items.map(item => `
+        <div class="number-box">
+          <div class="n">${item.num}</div>
+          <div class="t">${item.value}${suffix}</div>
+        </div>
+      `).join("");
+    }
+
+    function calculateMissingStreaks(rows) {
+      const results = [];
+
+      for (let num = 1; num <= 49; num++) {
+        let missing = 0;
+        let found = false;
+
+        for (let i = 0; i < rows.length; i++) {
+          const rowNums = [];
+          for (let j = 1; j <= 6; j++) {
+            const v = parseInt(rows[i]['n' + j]);
+            if (!isNaN(v)) rowNums.push(v);
+          }
+
+          if (rowNums.includes(num)) {
+            found = true;
+            break;
+          }
+          missing += 1;
+        }
+
+        results.push({
+          num,
+          value: found ? missing : rows.length
+        });
+      }
+
+      return results;
+    }
+
     fetch(csvUrl, { method: 'HEAD' })
       .then(res => {
         const lastMod = res.headers.get('Last-Modified');
@@ -326,18 +508,25 @@
         let total = 0;
         let stats = {
           oddEven: {},
-          consec: {}, // 🌟 轉用空 Object 裝連續次數
+          consec: {},
           repeats: { "0個": 0, "1個": 0, "2個+": 0 },
           zones: {}
         };
 
+        let mainFreq = {};
+        for (let i = 1; i <= 49; i++) mainFreq[i] = 0;
+
         rows.forEach(row => {
           total++;
+
+          for (let i = 1; i <= 6; i++) {
+            const v = parseInt(row['n' + i]);
+            if (!isNaN(v) && mainFreq[v] !== undefined) mainFreq[v] += 1;
+          }
 
           const oddEven = safe(row.odd_even);
           stats.oddEven[oddEven] = (stats.oddEven[oddEven] || 0) + 1;
 
-          // 🌟 統計連續次數
           const consecVal = safe(row.consecutive) || "0 個連續";
           stats.consec[consecVal] = (stats.consec[consecVal] || 0) + 1;
 
@@ -351,6 +540,30 @@
             stats.zones[z] = (stats.zones[z] || 0) + 1;
           }
         });
+
+        const hotNumbers = Object.entries(mainFreq)
+          .map(([num, count]) => ({ num: Number(num), value: count }))
+          .sort((a, b) => b.value - a.value || a.num - b.num)
+          .slice(0, 5);
+
+        const coldNumbers = Object.entries(mainFreq)
+          .map(([num, count]) => ({ num: Number(num), value: count }))
+          .sort((a, b) => a.value - b.value || a.num - b.num)
+          .slice(0, 5);
+
+        const missing15Plus = calculateMissingStreaks(rows)
+          .filter(item => item.value >= 15)
+          .sort((a, b) => b.value - a.value || a.num - b.num);
+
+        document.getElementById("totalDraws").textContent = total;
+        document.getElementById("topMain").textContent = hotNumbers[0] ? `${hotNumbers[0].num} (${hotNumbers[0].value}次)` : "-";
+
+        const topZone = Object.entries(stats.zones).sort((a, b) => b[1] - a[1])[0];
+        document.getElementById("topZone").textContent = topZone ? topZone[0] : "-";
+
+        renderNumberBoxes("hotMainNumbers", hotNumbers, "次");
+        renderNumberBoxes("coldMainNumbers", coldNumbers, "次");
+        renderNumberBoxes("missingLongGrid", missing15Plus, "期未開", "目前冇主號碼連續 15 期或以上未開");
 
         document.getElementById("dashboard-container").innerHTML = `
           <div class="dashboard">
@@ -394,7 +607,6 @@
             ? `<span class="ball gold-ball">${safe(row.gold_ball_number)}</span>`
             : `<span class="muted">-</span>`;
 
-          // 🌟 連續數量顏色標籤
           const consecStr = safe(row.consecutive);
           const consecClass = consecStr.includes("0") ? "no" : "yes";
 
