@@ -664,7 +664,7 @@
               <td>${safe(row.odd_even)}</td>
               <td><span class="${consecClass}">${consecStr}</span></td>
               <td><span class="repeat-pill ${repeatClass}">${repeatNum}個</span></td>
-              <td>${safe(row.zone)} ${getZoneCountTuple([row.n1, row.n2, row.n3, row.n4, row.n5, row.n6])}</td>
+              <td>${String(safe(row.zone)).replace(/\s*\([^)]*\)/, "")} ${getZoneCountTuple([row.n1, row.n2, row.n3, row.n4, row.n5, row.n6])}</td>
             </tr>
           `;
         });
