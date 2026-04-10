@@ -12,6 +12,8 @@
       --red-bg: #fffcfc;
       --green: #1e8e3e;
       --green-soft: #e6f4ea;
+      --blue: #1f7cff;
+      --blue-soft: rgba(31, 124, 255, 0.14);
       --gold: #f4c542;
       --gold-border: #c89f19;
       --text: #333;
@@ -68,7 +70,7 @@
 
     .summary-grid {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 15px;
       margin-bottom: 20px;
     }
@@ -320,6 +322,31 @@
       color: #222;
     }
 
+    .repeat-pill {
+      display: inline-block;
+      padding: 6px 10px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 13px;
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    .repeat-pill.red {
+      background: rgba(217, 48, 37, 0.14);
+      color: #d93025;
+    }
+
+    .repeat-pill.green {
+      background: rgba(30, 142, 62, 0.14);
+      color: #1e8e3e;
+    }
+
+    .repeat-pill.blue {
+      background: rgba(31, 124, 255, 0.14);
+      color: #1f7cff;
+    }
+
     @media (max-width: 1200px) {
       .summary-grid,
       .dashboard { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -355,10 +382,6 @@
       <div class="summary-card">
         <div class="summary-label">最常見分區</div>
         <div class="summary-value" id="topZone">-</div>
-      </div>
-      <div class="summary-card">
-        <div class="summary-label">資料檔</div>
-        <div class="summary-value" style="font-size:22px;">data.csv</div>
       </div>
     </div>
 
@@ -475,6 +498,23 @@
       }
 
       return results;
+    }
+
+    function getZoneCountTuple(numbers) {
+      const counts = [0, 0, 0, 0, 0];
+
+      numbers.forEach(n => {
+        const num = parseInt(n);
+        if (isNaN(num)) return;
+
+        if (num >= 1 && num <= 10) counts[0]++;
+        else if (num <= 20) counts[1]++;
+        else if (num <= 30) counts[2]++;
+        else if (num <= 40) counts[3]++;
+        else if (num <= 49) counts[4]++;
+      });
+
+      return `(${counts.join(",")})`;
     }
 
     fetch(csvUrl, { method: 'HEAD' })
@@ -610,6 +650,9 @@
           const consecStr = safe(row.consecutive);
           const consecClass = consecStr.includes("0") ? "no" : "yes";
 
+          const repeatNum = parseInt(row.repeats, 10) || 0;
+          const repeatClass = repeatNum === 0 ? "red" : (repeatNum === 1 ? "green" : "blue");
+
           html += `
             <tr>
               <td class="date-cell">${safe(row.date)}</td>
@@ -620,8 +663,8 @@
               <td>${renderGoldResultIcon(row.gold_result)}</td>
               <td>${safe(row.odd_even)}</td>
               <td><span class="${consecClass}">${consecStr}</span></td>
-              <td>${safe(row.repeats)}個</td>
-              <td>${safe(row.zone)}</td>
+              <td><span class="repeat-pill ${repeatClass}">${repeatNum}個</span></td>
+              <td>${getZoneCountTuple([row.n1, row.n2, row.n3, row.n4, row.n5, row.n6])}</td>
             </tr>
           `;
         });
