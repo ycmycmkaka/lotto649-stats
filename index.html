@@ -68,6 +68,32 @@
       line-height: 1.6;
     }
 
+    .filter-bar {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+
+    .filter-label {
+      font-size: 14px;
+      color: #666;
+      font-weight: bold;
+    }
+
+    .filter-input {
+      width: 120px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid #f3d3cf;
+      font-size: 14px;
+      font-weight: bold;
+      color: #333;
+      background: #fff;
+    }
+
     .summary-grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -360,6 +386,7 @@
       .summary-grid,
       .dashboard { grid-template-columns: 1fr; }
       .number-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .filter-bar { justify-content: flex-start; }
     }
   </style>
 </head>
@@ -370,9 +397,21 @@
 
     <div id="status" class="msg">正在連接資料庫...</div>
 
+    <div class="filter-bar">
+      <label for="drawLimitInput" class="filter-label">統計期數：</label>
+      <input
+        id="drawLimitInput"
+        class="filter-input"
+        type="number"
+        min="1"
+        step="1"
+        placeholder="全部"
+      />
+    </div>
+
     <div class="summary-grid">
       <div class="summary-card">
-        <div class="summary-label">總期數</div>
+        <div class="summary-label">統計期數</div>
         <div class="summary-value" id="totalDraws">-</div>
       </div>
       <div class="summary-card">
@@ -415,9 +454,20 @@
       return s === "" || s.toLowerCase() === "nan" ? "-" : s;
     }
 
+    function getFilteredRowsByLimit(rows) {
+      const rawValue = document.getElementById("drawLimitInput")?.value?.trim() || "";
+      if (!rawValue) return rows;
+
+      const limit = parseInt(rawValue, 10);
+      if (isNaN(limit) || limit <= 0) return rows;
+
+      return rows.slice(0, limit);
+    }
+
     function drawCard(title, obj, total, color) {
       const sorted = Object.entries(obj).sort((a, b) => b[1] - a[1]);
-      let h = `<div class="stat-card"><h3>${title}</h3>`;
+      let h = `<div class="dashboard">`;
+      h += `<div class="stat-card"><h3>${title}</h3>`;
 
       sorted.forEach(([label, count]) => {
         const pct = total ? Math.round((count / total) * 100) : 0;
@@ -438,7 +488,8 @@
         `;
       });
 
-      return h + `</div>`;
+      h += `</div></div>`;
+      return h;
     }
 
     function renderGoldResultIcon(v) {
@@ -517,6 +568,43 @@
       return `(${counts.join(",")})`;
     }
 
+    function renderDashboardCards(stats, total) {
+      return `
+        <div class="dashboard">
+          ${drawSingleCard("單雙分佈", stats.oddEven, total, "#d93025")}
+          ${drawSingleCard("連續號碼數量", stats.consec, total, "#1e8e3e")}
+          ${drawSingleCard("上期重複", stats.repeats, total, "#d93025")}
+          ${drawSingleCard("分區數量", stats.zones, total, "#d93025")}
+        </div>
+      `;
+    }
+
+    function drawSingleCard(title, obj, total, color) {
+      const sorted = Object.entries(obj).sort((a, b) => b[1] - a[1]);
+      let h = `<div class="stat-card"><h3>${title}</h3>`;
+
+      sorted.forEach(([label, count]) => {
+        const pct = total ? Math.round((count / total) * 100) : 0;
+        let barColor = color;
+
+        if (title === "連續號碼數量") {
+          barColor = label.includes("0") ? "#d93025" : "#1e8e3e";
+        }
+
+        h += `
+          <div class="bar-row">
+            <div class="bar-label">${label}</div>
+            <div class="bar-track">
+              <div class="bar-fill" style="width:${pct}%; background:${barColor}"></div>
+            </div>
+            <div class="bar-pct">${pct}%</div>
+          </div>
+        `;
+      });
+
+      return h + `</div>`;
+    }
+
     fetch(csvUrl, { method: 'HEAD' })
       .then(res => {
         const lastMod = res.headers.get('Last-Modified');
@@ -532,6 +620,131 @@
         document.getElementById("status").innerText = "✅ 最新數據已載入";
       });
 
+    function renderAll(rows) {
+      const filteredRows = getFilteredRowsByLimit(rows);
+
+      let total = 0;
+      let stats = {
+        oddEven: {},
+        consec: {},
+        repeats: { "0個": 0, "1個": 0, "2個+": 0 },
+        zones: {}
+      };
+
+      let mainFreq = {};
+      for (let i = 1; i <= 49; i++) mainFreq[i] = 0;
+
+      filteredRows.forEach(row => {
+        total++;
+
+        for (let i = 1; i <= 6; i++) {
+          const v = parseInt(row['n' + i]);
+          if (!isNaN(v) && mainFreq[v] !== undefined) mainFreq[v] += 1;
+        }
+
+        const oddEven = safe(row.odd_even);
+        stats.oddEven[oddEven] = (stats.oddEven[oddEven] || 0) + 1;
+
+        const consecVal = safe(row.consecutive) || "0 個連續";
+        stats.consec[consecVal] = (stats.consec[consecVal] || 0) + 1;
+
+        const r = parseInt(row.repeats, 10) || 0;
+        if (r === 0) stats.repeats["0個"]++;
+        else if (r === 1) stats.repeats["1個"]++;
+        else stats.repeats["2個+"]++;
+
+        if (row.zone) {
+          const z = String(row.zone).charAt(0) + "個區";
+          stats.zones[z] = (stats.zones[z] || 0) + 1;
+        }
+      });
+
+      const hotNumbers = Object.entries(mainFreq)
+        .map(([num, count]) => ({ num: Number(num), value: count }))
+        .sort((a, b) => b.value - a.value || a.num - b.num)
+        .slice(0, 5);
+
+      const coldNumbers = Object.entries(mainFreq)
+        .map(([num, count]) => ({ num: Number(num), value: count }))
+        .sort((a, b) => a.value - b.value || a.num - b.num)
+        .slice(0, 5);
+
+      const missing15Plus = calculateMissingStreaks(filteredRows)
+        .filter(item => item.value >= 15)
+        .sort((a, b) => b.value - a.value || a.num - b.num);
+
+      document.getElementById("totalDraws").textContent = total;
+      document.getElementById("topMain").textContent = hotNumbers[0] ? `${hotNumbers[0].num} (${hotNumbers[0].value}次)` : "-";
+
+      const topZone = Object.entries(stats.zones).sort((a, b) => b[1] - a[1])[0];
+      document.getElementById("topZone").textContent = topZone ? topZone[0] : "-";
+
+      renderNumberBoxes("hotMainNumbers", hotNumbers, "次");
+      renderNumberBoxes("coldMainNumbers", coldNumbers, "次");
+      renderNumberBoxes("missingLongGrid", missing15Plus, "期未開", "目前冇主號碼連續 15 期或以上未開");
+
+      document.getElementById("dashboard-container").innerHTML = `
+        <div class="dashboard">
+          ${drawSingleCard("單雙分佈", stats.oddEven, total, "#d93025")}
+          ${drawSingleCard("連續號碼數量", stats.consec, total, "#1e8e3e")}
+          ${drawSingleCard("上期重複", stats.repeats, total, "#d93025")}
+          ${drawSingleCard("分區數量", stats.zones, total, "#d93025")}
+        </div>
+      `;
+
+      let html = `
+        <table>
+          <thead>
+            <tr>
+              <th>日期</th>
+              <th>主號碼</th>
+              <th>Gold Ball Number</th>
+              <th>Gold Prize</th>
+              <th>Gold Result</th>
+              <th>單雙</th>
+              <th>連續數量</th>
+              <th>重複</th>
+              <th>分區</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      rows.forEach(row => {
+        let ballsHtml = "";
+        for (let i = 1; i <= 6; i++) {
+          ballsHtml += `<span class="ball main-ball">${safe(row["n" + i])}</span>`;
+        }
+
+        const goldBallHtml = safe(row.gold_ball_number) !== "-"
+          ? `<span class="ball gold-ball">${safe(row.gold_ball_number)}</span>`
+          : `<span class="muted">-</span>`;
+
+        const consecStr = safe(row.consecutive);
+        const consecClass = consecStr.includes("0") ? "no" : "yes";
+
+        const repeatNum = parseInt(row.repeats, 10) || 0;
+        const repeatClass = repeatNum === 0 ? "red" : (repeatNum === 1 ? "green" : "blue");
+
+        html += `
+          <tr>
+            <td class="date-cell">${safe(row.date)}</td>
+            <td><div class="balls">${ballsHtml}</div></td>
+            <td>${goldBallHtml}</td>
+            <td>${safe(row.gold_prize_type)}</td>
+            <td>${renderGoldResultIcon(row.gold_result)}</td>
+            <td>${safe(row.odd_even)}</td>
+            <td><span class="${consecClass}">${consecStr}</span></td>
+            <td><span class="repeat-pill ${repeatClass}">${repeatNum}個</span></td>
+            <td>${String(safe(row.zone)).replace(/\s*$begin:math:text$\[\^\)\]\*$end:math:text$/, "")} ${getZoneCountTuple([row.n1, row.n2, row.n3, row.n4, row.n5, row.n6])}</td>
+          </tr>
+        `;
+      });
+
+      html += `</tbody></table>`;
+      document.getElementById('table-wrap').innerHTML = html;
+    }
+
     Papa.parse(csvUrl, {
       download: true,
       header: true,
@@ -545,127 +758,11 @@
           return;
         }
 
-        let total = 0;
-        let stats = {
-          oddEven: {},
-          consec: {},
-          repeats: { "0個": 0, "1個": 0, "2個+": 0 },
-          zones: {}
-        };
+        renderAll(rows);
 
-        let mainFreq = {};
-        for (let i = 1; i <= 49; i++) mainFreq[i] = 0;
-
-        rows.forEach(row => {
-          total++;
-
-          for (let i = 1; i <= 6; i++) {
-            const v = parseInt(row['n' + i]);
-            if (!isNaN(v) && mainFreq[v] !== undefined) mainFreq[v] += 1;
-          }
-
-          const oddEven = safe(row.odd_even);
-          stats.oddEven[oddEven] = (stats.oddEven[oddEven] || 0) + 1;
-
-          const consecVal = safe(row.consecutive) || "0 個連續";
-          stats.consec[consecVal] = (stats.consec[consecVal] || 0) + 1;
-
-          const r = parseInt(row.repeats, 10) || 0;
-          if (r === 0) stats.repeats["0個"]++;
-          else if (r === 1) stats.repeats["1個"]++;
-          else stats.repeats["2個+"]++;
-
-          if (row.zone) {
-            const z = String(row.zone).charAt(0) + "個區";
-            stats.zones[z] = (stats.zones[z] || 0) + 1;
-          }
+        document.getElementById("drawLimitInput").addEventListener("input", () => {
+          renderAll(rows);
         });
-
-        const hotNumbers = Object.entries(mainFreq)
-          .map(([num, count]) => ({ num: Number(num), value: count }))
-          .sort((a, b) => b.value - a.value || a.num - b.num)
-          .slice(0, 5);
-
-        const coldNumbers = Object.entries(mainFreq)
-          .map(([num, count]) => ({ num: Number(num), value: count }))
-          .sort((a, b) => a.value - b.value || a.num - b.num)
-          .slice(0, 5);
-
-        const missing15Plus = calculateMissingStreaks(rows)
-          .filter(item => item.value >= 15)
-          .sort((a, b) => b.value - a.value || a.num - b.num);
-
-        document.getElementById("totalDraws").textContent = total;
-        document.getElementById("topMain").textContent = hotNumbers[0] ? `${hotNumbers[0].num} (${hotNumbers[0].value}次)` : "-";
-
-        const topZone = Object.entries(stats.zones).sort((a, b) => b[1] - a[1])[0];
-        document.getElementById("topZone").textContent = topZone ? topZone[0] : "-";
-
-        renderNumberBoxes("hotMainNumbers", hotNumbers, "次");
-        renderNumberBoxes("coldMainNumbers", coldNumbers, "次");
-        renderNumberBoxes("missingLongGrid", missing15Plus, "期未開", "目前冇主號碼連續 15 期或以上未開");
-
-        document.getElementById("dashboard-container").innerHTML = `
-          <div class="dashboard">
-            ${drawCard("單雙分佈", stats.oddEven, total, "#d93025")}
-            ${drawCard("連續號碼數量", stats.consec, total, "#1e8e3e")}
-            ${drawCard("上期重複", stats.repeats, total, "#d93025")}
-            ${drawCard("分區數量", stats.zones, total, "#d93025")}
-          </div>
-        `;
-
-        let html = `
-          <table>
-            <thead>
-              <tr>
-                <th>日期</th>
-                <th>主號碼</th>
-                <th>Gold Ball Number</th>
-                <th>Gold Prize</th>
-                <th>Gold Result</th>
-                <th>單雙</th>
-                <th>連續數量</th>
-                <th>重複</th>
-                <th>分區</th>
-              </tr>
-            </thead>
-            <tbody>
-        `;
-
-        rows.forEach(row => {
-          let ballsHtml = "";
-          for (let i = 1; i <= 6; i++) {
-            ballsHtml += `<span class="ball main-ball">${safe(row["n" + i])}</span>`;
-          }
-
-
-          const goldBallHtml = safe(row.gold_ball_number) !== "-"
-            ? `<span class="ball gold-ball">${safe(row.gold_ball_number)}</span>`
-            : `<span class="muted">-</span>`;
-
-          const consecStr = safe(row.consecutive);
-          const consecClass = consecStr.includes("0") ? "no" : "yes";
-
-          const repeatNum = parseInt(row.repeats, 10) || 0;
-          const repeatClass = repeatNum === 0 ? "red" : (repeatNum === 1 ? "green" : "blue");
-
-          html += `
-            <tr>
-              <td class="date-cell">${safe(row.date)}</td>
-              <td><div class="balls">${ballsHtml}</div></td>
-              <td>${goldBallHtml}</td>
-              <td>${safe(row.gold_prize_type)}</td>
-              <td>${renderGoldResultIcon(row.gold_result)}</td>
-              <td>${safe(row.odd_even)}</td>
-              <td><span class="${consecClass}">${consecStr}</span></td>
-              <td><span class="repeat-pill ${repeatClass}">${repeatNum}個</span></td>
-              <td>${String(safe(row.zone)).replace(/\s*\([^)]*\)/, "")} ${getZoneCountTuple([row.n1, row.n2, row.n3, row.n4, row.n5, row.n6])}</td>
-            </tr>
-          `;
-        });
-
-        html += `</tbody></table>`;
-        document.getElementById('table-wrap').innerHTML = html;
       },
       error: function(err) {
         document.getElementById("status").innerText = "讀取 data.csv 失敗。";
