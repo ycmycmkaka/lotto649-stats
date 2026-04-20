@@ -191,7 +191,7 @@
 
     .number-grid {
       display: grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 10px;
     }
 
@@ -507,12 +507,12 @@
 
     <div class="feature-grid">
       <div class="number-card">
-        <h3>最熱門主號碼 Top 5</h3>
+        <h3>最熱門主號碼 Top 6</h3>
         <div class="number-grid" id="hotMainNumbers"></div>
       </div>
 
       <div class="number-card">
-        <h3>最冷門主號碼 Top 5</h3>
+        <h3>最冷門主號碼 Top 6</h3>
         <div class="number-grid" id="coldMainNumbers"></div>
       </div>
 
@@ -844,12 +844,12 @@
       const hotNumbers = Object.entries(mainFreq)
         .map(([num, count]) => ({ num: Number(num), value: count }))
         .sort((a, b) => b.value - a.value || a.num - b.num)
-        .slice(0, 5);
+        .slice(0, 6);
 
       const coldNumbers = Object.entries(mainFreq)
         .map(([num, count]) => ({ num: Number(num), value: count }))
         .sort((a, b) => a.value - b.value || a.num - b.num)
-        .slice(0, 5);
+        .slice(0, 6);
 
       const missing15Plus = calculateMissingStreaks(filteredRows)
         .filter(item => item.value >= 15)
