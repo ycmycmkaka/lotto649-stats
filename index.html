@@ -130,7 +130,8 @@
     }
 
     .number-card,
-    .stat-card {
+    .stat-card,
+    .compare-card {
       background: #fffcfc;
       border: 1px solid #fce8e6;
       border-radius: 10px;
@@ -138,50 +139,14 @@
     }
 
     .number-card h3,
-    .stat-card h3 {
+    .stat-card h3,
+    .compare-card h3 {
       margin: 0 0 10px 0;
       font-size: 15px;
       color: var(--red);
       border-bottom: 2px solid #fce8e6;
       padding-bottom: 6px;
       text-align: center;
-    }
-
-    .number-grid {
-      display: grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
-      gap: 10px;
-    }
-
-    .number-box {
-      background: #fff;
-      border: 1px solid #f3d3cf;
-      border-radius: 12px;
-      padding: 12px 6px;
-      text-align: center;
-    }
-
-    .number-box .n {
-      font-size: 22px;
-      font-weight: 800;
-      color: var(--red);
-      line-height: 1;
-      margin-bottom: 6px;
-    }
-
-    .number-box .t {
-      font-size: 12px;
-      color: #666;
-      font-weight: 700;
-      line-height: 1.3;
-    }
-
-    .empty-note {
-      color: #888;
-      text-align: center;
-      font-size: 13px;
-      font-weight: bold;
-      padding: 10px 0;
     }
 
     .dashboard {
@@ -222,6 +187,120 @@
       width: 40px;
       text-align: right;
       font-weight: bold;
+    }
+
+    .number-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .number-box {
+      background: #fff;
+      border: 1px solid #f3d3cf;
+      border-radius: 12px;
+      padding: 12px 6px;
+      text-align: center;
+    }
+
+    .number-box .n {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--red);
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+
+    .number-box .t {
+      font-size: 12px;
+      color: #666;
+      font-weight: 700;
+      line-height: 1.3;
+    }
+
+    .empty-note {
+      color: #888;
+      text-align: center;
+      font-size: 13px;
+      font-weight: bold;
+      padding: 10px 0;
+    }
+
+    .compare-input-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .compare-input {
+      flex: 1;
+      min-width: 260px;
+      padding: 12px;
+      border: 1px solid #f3d3cf;
+      border-radius: 10px;
+      font-size: 14px;
+      background: #fff;
+    }
+
+    .compare-btn {
+      padding: 12px 16px;
+      border: none;
+      border-radius: 10px;
+      background: var(--red);
+      color: #fff;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .compare-btn:hover {
+      opacity: 0.92;
+    }
+
+    .compare-result-wrap {
+      display: grid;
+      gap: 10px;
+    }
+
+    .compare-summary {
+      padding: 12px;
+      border-radius: 10px;
+      background: #fff6f5;
+      border: 1px solid #f6d6d2;
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    .compare-hit-card {
+      padding: 12px;
+      border: 1px solid #f3d3cf;
+      border-radius: 10px;
+      background: #fff;
+      line-height: 1.7;
+      font-size: 14px;
+    }
+
+    .match-balls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .match-ball {
+      display: inline-flex;
+      min-width: 30px;
+      height: 30px;
+      border-radius: 999px;
+      align-items: center;
+      justify-content: center;
+      background: rgba(217, 48, 37, 0.14);
+      color: #d93025;
+      border: 1px solid #f1b8b0;
+      font-weight: 700;
+      font-size: 13px;
+      padding: 0 8px;
     }
 
     .table-wrap {
@@ -387,6 +466,8 @@
       .dashboard { grid-template-columns: 1fr; }
       .number-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .filter-bar { justify-content: flex-start; }
+      .compare-input-row { flex-direction: column; align-items: stretch; }
+      .compare-btn { width: 100%; }
     }
   </style>
 </head>
@@ -441,6 +522,15 @@
       </div>
     </div>
 
+    <div class="compare-card" style="margin-bottom:20px;">
+      <h3>歷史對比查詢（輸入 6 個主號碼）</h3>
+      <div class="compare-input-row">
+        <input id="compareInput" class="compare-input" type="text" placeholder="例如：4,13,20,31,37,43" />
+        <button id="compareBtn" class="compare-btn">開始比對</button>
+      </div>
+      <div id="compareResult" class="empty-note">輸入 6 個不重複主號碼，系統會幫你搵出歷史上最多相同號碼嘅期數。</div>
+    </div>
+
     <div id="dashboard-container"></div>
     <div class="table-wrap" id="table-wrap"></div>
   </div>
@@ -462,6 +552,98 @@
       if (isNaN(limit) || limit <= 0) return rows;
 
       return rows.slice(0, limit);
+    }
+
+    function parseUserNumbers(input) {
+      const nums = input
+        .split(/[^0-9]+/)
+        .map(x => parseInt(x, 10))
+        .filter(x => !isNaN(x));
+
+      const uniqueNums = [...new Set(nums)];
+
+      if (uniqueNums.length !== 6) {
+        return { error: "請輸入 6 個不重複主號碼。" };
+      }
+
+      if (uniqueNums.some(n => n < 1 || n > 49)) {
+        return { error: "號碼必須介乎 1 至 49。" };
+      }
+
+      uniqueNums.sort((a, b) => a - b);
+      return { numbers: uniqueNums };
+    }
+
+    function compareUserNumbers(rows, userNumbers) {
+      let maxMatch = 0;
+      let bestRows = [];
+
+      rows.forEach(row => {
+        const drawNums = [];
+        for (let i = 1; i <= 6; i++) {
+          const v = parseInt(row['n' + i], 10);
+          if (!isNaN(v)) drawNums.push(v);
+        }
+
+        const matched = userNumbers.filter(n => drawNums.includes(n));
+
+        if (matched.length > maxMatch) {
+          maxMatch = matched.length;
+          bestRows = [{
+            date: row.date || "-",
+            drawNums,
+            matched,
+            prize: row.gold_prize_type || "-"
+          }];
+        } else if (matched.length === maxMatch) {
+          bestRows.push({
+            date: row.date || "-",
+            drawNums,
+            matched,
+            prize: row.gold_prize_type || "-"
+          });
+        }
+      });
+
+      return { maxMatch, bestRows };
+    }
+
+    function runNumberComparison(rows) {
+      const input = document.getElementById("compareInput").value.trim();
+      const resultBox = document.getElementById("compareResult");
+
+      const parsed = parseUserNumbers(input);
+      if (parsed.error) {
+        resultBox.innerHTML = `<span style="color:#d93025; font-weight:bold;">${parsed.error}</span>`;
+        return;
+      }
+
+      const result = compareUserNumbers(rows, parsed.numbers);
+
+      if (!result.bestRows.length || result.maxMatch === 0) {
+        resultBox.innerHTML = `冇搵到任何一期有相同主號碼。`;
+        return;
+      }
+
+      resultBox.innerHTML = `
+        <div class="compare-result-wrap">
+          <div class="compare-summary">
+            <div><strong>你輸入嘅主號碼：</strong>${parsed.numbers.join(", ")}</div>
+            <div><strong>歷史最多相同主號碼：</strong>${result.maxMatch} 個</div>
+          </div>
+          ${result.bestRows.map(r => `
+            <div class="compare-hit-card">
+              <div><strong>期數：</strong>${r.date}</div>
+              <div><strong>當期主號碼：</strong>${r.drawNums.join(", ")}</div>
+              <div><strong>Gold Prize：</strong>${r.prize}</div>
+              <div><strong>相同號碼：</strong></div>
+              <div class="match-balls">
+                ${r.matched.map(n => `<span class="match-ball">${n}</span>`).join("") || "無"}
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      `;
     }
 
     function drawCard(title, obj, total, color) {
@@ -762,6 +944,16 @@
 
         document.getElementById("drawLimitInput").addEventListener("input", () => {
           renderAll(rows);
+        });
+
+        document.getElementById("compareBtn").addEventListener("click", () => {
+          runNumberComparison(rows);
+        });
+
+        document.getElementById("compareInput").addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
+            runNumberComparison(rows);
+          }
         });
       },
       error: function(err) {
