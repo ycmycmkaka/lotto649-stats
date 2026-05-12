@@ -136,6 +136,7 @@
       border: 1px solid #fce8e6;
       border-radius: 10px;
       padding: 15px;
+      min-width: 0;
     }
 
     .number-card h3,
@@ -303,19 +304,77 @@
       padding: 0 8px;
     }
 
+    .zone-combo-wrap {
+      max-width: 1120px;
+      margin: 0 auto 20px auto;
+    }
+
+    .zone-combo-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.95fr);
+      gap: 12px;
+      align-items: start;
+      margin-bottom: 12px;
+    }
+
+    .combo-note-card {
+      max-width: 1120px;
+      margin: 0 auto;
+    }
+
+    .combo-table-wrap {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      border-radius: 8px;
+    }
+
+    .combo-table {
+      width: 100%;
+      min-width: 0;
+      border-collapse: collapse;
+      font-size: 12px;
+      table-layout: auto;
+    }
+
+    .combo-table th,
+    .combo-table td {
+      padding: 8px 6px;
+      border-bottom: 1px solid #f0dedd;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .combo-table th {
+      background: #fff6f5;
+      color: #666;
+      font-weight: 700;
+      position: static;
+    }
+
+    .combo-pill {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: rgba(31, 124, 255, 0.12);
+      color: #1f7cff;
+      font-weight: 700;
+      border: 1px solid #d2e3fc;
+    }
+
     .table-wrap {
       overflow-x: auto;
       border: 1px solid #eee;
       border-radius: 10px;
     }
 
-    table {
+    table.main-table {
       width: 100%;
       min-width: 1300px;
       border-collapse: collapse;
     }
 
-    th {
+    table.main-table th {
       background: var(--red);
       color: white;
       padding: 12px 8px;
@@ -326,7 +385,7 @@
       z-index: 10;
     }
 
-    td {
+    table.main-table td {
       border-bottom: 1px solid #eee;
       padding: 12px 8px;
       text-align: center;
@@ -454,8 +513,21 @@
 
     @media (max-width: 1200px) {
       .summary-grid,
-      .dashboard { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .feature-grid { grid-template-columns: 1fr; }
+      .dashboard {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .feature-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .zone-combo-wrap {
+        max-width: 100%;
+      }
+
+      .zone-combo-grid {
+        grid-template-columns: 1fr;
+      }
     }
 
     @media (max-width: 700px) {
@@ -468,6 +540,20 @@
       .filter-bar { justify-content: flex-start; }
       .compare-input-row { flex-direction: column; align-items: stretch; }
       .compare-btn { width: 100%; }
+
+      .combo-table {
+        font-size: 11px;
+      }
+
+      .combo-table th,
+      .combo-table td {
+        padding: 7px 4px;
+      }
+
+      .combo-pill {
+        padding: 3px 6px;
+        font-size: 11px;
+      }
     }
   </style>
 </head>
@@ -488,6 +574,16 @@
         step="1"
         placeholder="全部"
       />
+
+      <label for="zoneFilterSelect" class="filter-label">分區篩選：</label>
+      <select id="zoneFilterSelect" class="filter-input">
+        <option value="">全部</option>
+        <option value="1">1個區</option>
+        <option value="2">2個區</option>
+        <option value="3">3個區</option>
+        <option value="4">4個區</option>
+        <option value="5">5個區</option>
+      </select>
     </div>
 
     <div class="summary-grid">
@@ -532,6 +628,28 @@
     </div>
 
     <div id="dashboard-container"></div>
+
+    <div class="zone-combo-wrap">
+      <div class="zone-combo-grid">
+        <div class="number-card">
+          <h3>3區組合統計（10種）</h3>
+          <div class="combo-table-wrap" id="zoneCombo3Table"></div>
+        </div>
+
+        <div class="number-card">
+          <h3>4區組合統計（5種）</h3>
+          <div class="combo-table-wrap" id="zoneCombo4Table"></div>
+        </div>
+      </div>
+
+      <div class="number-card combo-note-card">
+        <h3>分區統計說明</h3>
+        <div class="empty-note">
+          只統計主號碼覆蓋剛好 3 區或 4 區嘅組合，顯示 Total 同目前間隔。
+        </div>
+      </div>
+    </div>
+
     <div class="table-wrap" id="table-wrap"></div>
   </div>
 
@@ -552,6 +670,108 @@
       if (isNaN(limit) || limit <= 0) return rows;
 
       return rows.slice(0, limit);
+    }
+
+    function getZoneCountValue(numbers) {
+      return new Set(
+        numbers.map(n => {
+          if (n >= 1 && n <= 10) return 1;
+          if (n <= 20) return 2;
+          if (n <= 30) return 3;
+          if (n <= 40) return 4;
+          return 5;
+        })
+      ).size;
+    }
+
+    function buildZoneCombos(size) {
+      const zones = [1, 2, 3, 4, 5];
+      const result = [];
+
+      function helper(start, path) {
+        if (path.length === size) {
+          result.push(path.join(","));
+          return;
+        }
+        for (let i = start; i < zones.length; i++) {
+          helper(i + 1, [...path, zones[i]]);
+        }
+      }
+
+      helper(0, []);
+      return result;
+    }
+
+    function getZoneComboKey(numbers, size) {
+      const zoneSet = new Set(
+        numbers.map(n => {
+          if (n >= 1 && n <= 10) return 1;
+          if (n <= 20) return 2;
+          if (n <= 30) return 3;
+          if (n <= 40) return 4;
+          return 5;
+        })
+      );
+
+      const arr = [...zoneSet].sort((a, b) => a - b);
+      if (arr.length !== size) return null;
+      return arr.join(",");
+    }
+
+    function renderZoneComboStats(rows, size, targetId) {
+      const combos = buildZoneCombos(size);
+      const statsMap = {};
+
+      combos.forEach(combo => {
+        statsMap[combo] = {
+          combo,
+          count: 0,
+          gap: "-"
+        };
+      });
+
+      rows.forEach((row, index) => {
+        const nums = [];
+        for (let i = 1; i <= 6; i++) {
+          const v = parseInt(row['n' + i], 10);
+          if (!isNaN(v)) nums.push(v);
+        }
+
+        const comboKey = getZoneComboKey(nums, size);
+        if (!comboKey || !statsMap[comboKey]) return;
+
+        statsMap[comboKey].count += 1;
+
+        if (statsMap[comboKey].gap === "-") {
+          statsMap[comboKey].gap = `${index}期`;
+        }
+      });
+
+      let html = `
+        <table class="combo-table">
+          <thead>
+            <tr>
+              <th>${size}區組合</th>
+              <th>Total</th>
+              <th>目前間隔</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      combos.forEach(combo => {
+        const item = statsMap[combo];
+        html += `
+          <tr>
+            <td><span class="combo-pill">${item.combo}</span></td>
+            <td><strong>${item.count}</strong></td>
+            <td>${item.gap}</td>
+          </tr>
+        `;
+      });
+
+      html += `</tbody></table>`;
+      document.getElementById(targetId).innerHTML = html;
     }
 
     function parseUserNumbers(input) {
@@ -646,15 +866,14 @@
       `;
     }
 
-    function drawCard(title, obj, total, color) {
+    function drawSingleCard(title, obj, total, color) {
       const sorted = Object.entries(obj).sort((a, b) => b[1] - a[1]);
-      let h = `<div class="dashboard">`;
-      h += `<div class="stat-card"><h3>${title}</h3>`;
+      let h = `<div class="stat-card"><h3>${title}</h3>`;
 
       sorted.forEach(([label, count]) => {
         const pct = total ? Math.round((count / total) * 100) : 0;
-
         let barColor = color;
+
         if (title === "連續號碼數量") {
           barColor = label.includes("0") ? "#d93025" : "#1e8e3e";
         }
@@ -670,8 +889,7 @@
         `;
       });
 
-      h += `</div></div>`;
-      return h;
+      return h + `</div>`;
     }
 
     function renderGoldResultIcon(v) {
@@ -713,7 +931,7 @@
         for (let i = 0; i < rows.length; i++) {
           const rowNums = [];
           for (let j = 1; j <= 6; j++) {
-            const v = parseInt(rows[i]['n' + j]);
+            const v = parseInt(rows[i]['n' + j], 10);
             if (!isNaN(v)) rowNums.push(v);
           }
 
@@ -737,7 +955,7 @@
       const counts = [0, 0, 0, 0, 0];
 
       numbers.forEach(n => {
-        const num = parseInt(n);
+        const num = parseInt(n, 10);
         if (isNaN(num)) return;
 
         if (num >= 1 && num <= 10) counts[0]++;
@@ -748,43 +966,6 @@
       });
 
       return `(${counts.join(",")})`;
-    }
-
-    function renderDashboardCards(stats, total) {
-      return `
-        <div class="dashboard">
-          ${drawSingleCard("單雙分佈", stats.oddEven, total, "#d93025")}
-          ${drawSingleCard("連續號碼數量", stats.consec, total, "#1e8e3e")}
-          ${drawSingleCard("上期重複", stats.repeats, total, "#d93025")}
-          ${drawSingleCard("分區數量", stats.zones, total, "#d93025")}
-        </div>
-      `;
-    }
-
-    function drawSingleCard(title, obj, total, color) {
-      const sorted = Object.entries(obj).sort((a, b) => b[1] - a[1]);
-      let h = `<div class="stat-card"><h3>${title}</h3>`;
-
-      sorted.forEach(([label, count]) => {
-        const pct = total ? Math.round((count / total) * 100) : 0;
-        let barColor = color;
-
-        if (title === "連續號碼數量") {
-          barColor = label.includes("0") ? "#d93025" : "#1e8e3e";
-        }
-
-        h += `
-          <div class="bar-row">
-            <div class="bar-label">${label}</div>
-            <div class="bar-track">
-              <div class="bar-fill" style="width:${pct}%; background:${barColor}"></div>
-            </div>
-            <div class="bar-pct">${pct}%</div>
-          </div>
-        `;
-      });
-
-      return h + `</div>`;
     }
 
     fetch(csvUrl, { method: 'HEAD' })
@@ -820,7 +1001,7 @@
         total++;
 
         for (let i = 1; i <= 6; i++) {
-          const v = parseInt(row['n' + i]);
+          const v = parseInt(row['n' + i], 10);
           if (!isNaN(v) && mainFreq[v] !== undefined) mainFreq[v] += 1;
         }
 
@@ -835,10 +1016,15 @@
         else if (r === 1) stats.repeats["1個"]++;
         else stats.repeats["2個+"]++;
 
-        if (row.zone) {
-          const z = String(row.zone).charAt(0) + "個區";
-          stats.zones[z] = (stats.zones[z] || 0) + 1;
+        const nums = [];
+        for (let i = 1; i <= 6; i++) {
+          const v = parseInt(row['n' + i], 10);
+          if (!isNaN(v)) nums.push(v);
         }
+
+        const zoneCount = getZoneCountValue(nums);
+        const zoneLabel = `${zoneCount}個區`;
+        stats.zones[zoneLabel] = (stats.zones[zoneLabel] || 0) + 1;
       });
 
       const hotNumbers = Object.entries(mainFreq)
@@ -874,8 +1060,25 @@
         </div>
       `;
 
+      renderZoneComboStats(filteredRows, 3, "zoneCombo3Table");
+      renderZoneComboStats(filteredRows, 4, "zoneCombo4Table");
+
+      const selectedZone = document.getElementById("zoneFilterSelect")?.value || "";
+
+      const tableRows = rows.filter(row => {
+        if (!selectedZone) return true;
+
+        const rowNums = [];
+        for (let i = 1; i <= 6; i++) {
+          const v = parseInt(row['n' + i], 10);
+          if (!isNaN(v)) rowNums.push(v);
+        }
+
+        return getZoneCountValue(rowNums) === parseInt(selectedZone, 10);
+      });
+
       let html = `
-        <table>
+        <table class="main-table">
           <thead>
             <tr>
               <th>日期</th>
@@ -892,7 +1095,7 @@
           <tbody>
       `;
 
-      rows.forEach(row => {
+      tableRows.forEach(row => {
         let ballsHtml = "";
         for (let i = 1; i <= 6; i++) {
           ballsHtml += `<span class="ball main-ball">${safe(row["n" + i])}</span>`;
@@ -908,6 +1111,10 @@
         const repeatNum = parseInt(row.repeats, 10) || 0;
         const repeatClass = repeatNum === 0 ? "red" : (repeatNum === 1 ? "green" : "blue");
 
+        const nums = [row.n1, row.n2, row.n3, row.n4, row.n5, row.n6];
+        const zoneCount = getZoneCountValue(nums.map(n => parseInt(n, 10)).filter(n => !isNaN(n)));
+        const zoneText = `${zoneCount}個區 ${getZoneCountTuple(nums)}`;
+
         html += `
           <tr>
             <td class="date-cell">${safe(row.date)}</td>
@@ -918,7 +1125,7 @@
             <td>${safe(row.odd_even)}</td>
             <td><span class="${consecClass}">${consecStr}</span></td>
             <td><span class="repeat-pill ${repeatClass}">${repeatNum}個</span></td>
-            <td>${String(safe(row.zone)).match(/^\d+個區/)?.[0] || safe(row.zone)} ${getZoneCountTuple([row.n1, row.n2, row.n3, row.n4, row.n5, row.n6])}</td>
+            <td>${zoneText}</td>
           </tr>
         `;
       });
@@ -943,6 +1150,10 @@
         renderAll(rows);
 
         document.getElementById("drawLimitInput").addEventListener("input", () => {
+          renderAll(rows);
+        });
+
+        document.getElementById("zoneFilterSelect").addEventListener("change", () => {
           renderAll(rows);
         });
 
